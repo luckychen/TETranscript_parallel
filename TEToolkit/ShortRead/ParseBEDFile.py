@@ -12,9 +12,9 @@ import gzip
 from array import array
 from time import time
 from math import ceil,floor 
-from TEToolkit.Constants import BIN_SIZE,MAX_BIT, species_chrom_lengths
-from TEToolkit.IO.FeatIO import FWTrackII
-from TEToolkit.TEindex import *
+from Constants import BIN_SIZE,MAX_BIT, species_chrom_lengths
+from IO.FeatIO import FWTrackII
+from TEindex import *
 #import rpy2.robjects as robjects
 
 

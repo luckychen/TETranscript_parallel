@@ -16,7 +16,7 @@ import gzip
 from math import ceil,floor
 import collections
 
-from TEToolkit.IntervalTree import *
+from IntervalTree import *
 
 #Taken from HTSeq
 class GFF_Reader( ):
@@ -61,10 +61,10 @@ class GFF_Reader( ):
 
        for pairs in attributeStr.split(';') :
            if pairs.count('"') not in [0,2] :
-               raise ValueError, "The attribute string seems to contain mismatched quotes."
+               raise (ValueError, "The attribute string seems to contain mismatched quotes.")
            nv = self._re_attr_main.match(pairs)
            if not nv :
-               raise ValueError, "Failure parsing GFF attribute line."
+               raise (ValueError, "Failure parsing GFF attribute line.")
            val = nv.group(2)
            name = nv.group(1)
            if name == id_interested :

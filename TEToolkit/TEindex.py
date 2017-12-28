@@ -15,7 +15,7 @@ with the distribution).
 import sys, time
 import logging
 from math import ceil,floor
-from TEToolkit.Constants import TEindex_BINSIZE
+from Constants import TEindex_BINSIZE
 
 #TEindex_BINSIZE = 200
 sys.setrecursionlimit(10000)
@@ -70,6 +70,7 @@ class Node :
             eles = self.__namelist[s]
             for name, e in eles :
                 if start <= e and end >= s :
+                    print name, start, end, s, e;
                     TEnamelist.append(name)
 
         return TEnamelist
@@ -319,6 +320,10 @@ class TEfeatures:
 
             return None
 
+    # looks up the TE index interval tree with start end, 
+    # find the nodes corresponding to the intervals 
+    # returns all overlapping TE names within the node
+
     def findOvpTE(self,chrom,start,end):
         startbinID = start/TEindex_BINSIZE
         endbinID = end/TEindex_BINSIZE
@@ -357,6 +362,7 @@ class TEfeatures:
                     if strand != "." : #stranded
                         if strand == self.getStrand(t)  :
                             if t not in TEs :
+                                print self.getFullName(t)
                                 TEs.append(t)
                     else :#not stranded
                         if t not in TEs :
@@ -453,10 +459,106 @@ class TEfeatures:
                     sys.stderr.write("TE GTF format error! There is no annotation at line %s.\n" % (linenum))
                     raise
 
+                # name of TE is e.g.
+                # AluSp:AluSp:Alu:SINE:+
                 full_name = name+':'+ele_id+':'+family_id+':'+class_id+':'+strand
                 ele_name = ele_id+':'+family_id+':'+class_id
                 if ele_name not in self._elements :
                     self._elements.append(ele_name)
+
+                self._length.append(tlen)
+                self._nameIDmap.append(full_name)
+
+                if self.indexlist.has_key(chrom) :
+                        index = self.indexlist[chrom]
+
+                        bin_startID = start/TEindex_BINSIZE
+                        bin_endID = end/TEindex_BINSIZE
+                        if start == bin_startID * TEindex_BINSIZE :
+                            bin_startID -= 1
+                        while bin_startID <= bin_endID :
+                            end_pos = min(end,(bin_startID+1) * TEindex_BINSIZE )
+                            start_pos = max(start,bin_startID * TEindex_BINSIZE+1)
+
+                            index.insert(start_pos,end_pos,name_idx)
+                            bin_startID += 1
+
+                else :
+                        index = BinaryTree()
+                        bin_startID = start/TEindex_BINSIZE
+                        bin_endID = end/TEindex_BINSIZE
+                        if start == bin_startID * TEindex_BINSIZE :
+                            bin_startID -= 1
+                        while bin_startID <= bin_endID :
+                            end_pos = min(end,(bin_startID+1) * TEindex_BINSIZE )
+                            start_pos = max(start,bin_startID * TEindex_BINSIZE+1)
+                            index.insert(start_pos,end_pos,name_idx)
+                            bin_startID += 1
+
+                        self.indexlist[chrom] = index
+
+                name_idx += 1
+
+            f.close()
+
+
+    def build_introns (self,filename,te_mode):
+            self.__srcfile = filename
+
+            try:
+                f = open(self.__srcfile,'r')
+            except:
+                logging.error("cannot open such file %s !\n" %(self.__srcfile))
+                sys.exit(1)
+
+            name_idx = 0
+            linenum = 0
+            for line in f :
+                line = line.strip()
+                items = line.split('\t')
+                chrom = items[0]
+                start = int(items[3])
+                end = int(items[4])
+                strand = items[6]
+                items[8] = items[8].replace("; ",";")
+                desc = items[8].split(';')
+                name = []
+                family_id = [] 
+                ele_id = []
+                class_id = []
+                tlen = end - start + 1
+                linenum += 1
+
+                for i in range(len(desc)) :
+                    desc[i] = desc[i].replace("\"","")
+                    pos = desc[i].find(" ")
+                    tid = desc[i][:pos]
+                    val = desc[i][pos+1:len(desc[i])]
+
+                    if tid == "gene_id" :
+                        ele_id.append (val)
+                    if tid == "transcript_id" :
+                        name.append (val)
+                    if tid == "family_id" :
+                        family_id.append (val)
+                    if tid == "class_id" :
+                        class_id.append (val)
+
+                if ele_id == [] or name == [] or family_id == [] or class_id == [] :
+                    sys.stderr.write(line+"\n")
+                    sys.stderr.write("TE GTF format error! There is no annotation at line %s.\n" % (linenum))
+                    raise
+
+                # name of intron is e.g.
+                # AluSp_dup2_right:AluSp:Alu:SINE:+;L2b_dup12455_left:L2b:L2:LINE:+"
+                full_name = ""
+                for i in range(len(name)) :
+                    if fullname != "":
+                        full_name += ";"
+                    full_name += name[i]+':'+ele_id[i]+':'+family_id[i]+':'+class_id[i]+':'+strand
+                    ele_name = ele_id[i]+':'+family_id[i]+':'+class_id[i]
+                    if ele_name not in self._elements :
+                        self._elements.append(ele_name)
 
                 self._length.append(tlen)
                 self._nameIDmap.append(full_name)

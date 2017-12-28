@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/python
 
 '''
 Created on Jan 27, 2014
@@ -8,7 +8,7 @@ Created on Jan 27, 2014
 @author: Oliver Tam
 @contact tam@cshl.edu
 @status: 
-@version: 1.5.1
+@version: 1.5.0
 '''
 # python module
 import sys
@@ -20,13 +20,16 @@ import traceback
 
 import subprocess
 from time import time
+import datetime
 import pysam
+import cPickle as pickle
+import gc
 
-from TEToolkit.IO.ReadInputs import read_opts2
-from TEToolkit.TEindex import *
-from TEToolkit.EMAlgorithm import *
-from TEToolkit.IntervalTree import *
-from TEToolkit.GeneFeatures import *
+from IO.ReadInputs import read_opts2
+from TEindex import *
+from EMAlgorithm import *
+from IntervalTree import *
+from GeneFeatures import *
 
 ### Define parameters for program ###
 def prepare_parser():
@@ -44,6 +47,8 @@ def prepare_parser():
                         help='GTF file for gene annotations')
     parser.add_argument('--TE', metavar='TE-GTF-file', dest='tefile', type=str, required=True,
                         help='GTF file for transposable element annotations')
+    parser.add_argument('--intron', metavar='intron-GTF-file', dest='intronfile', type=str, required=True,
+                        help='GTF file for introns flanking transposable elements')
     parser.add_argument('--format', metavar='input file format', dest='format', type=str, nargs='?', default='BAM', choices=['BAM','SAM'],
                         help='Input file format: BAM or SAM. DEFAULT: BAM')
     parser.add_argument('--stranded', metavar='option', dest='stranded', nargs='?', type=str, default="yes", choices=['yes','no','reverse'],
@@ -69,9 +74,11 @@ def prepare_parser():
     parser.add_argument('--minL',metavar='minL',dest='minL',nargs='?',type=int,default=0,help='minimum fragment length. DEFAULT:0')
     parser.add_argument('-L', '--fragmentLength', metavar='fragLength', dest='fragLength', nargs='?', type=int,  default=0,
                         help='average fragment length for single end reads. For paired-end, estimated from the input alignment file. DEFAULT: for paired-end, estimate from the input alignment file; for single-end, ignored by default.')
+    parser.add_argument('--pickle', dest = 'b_pickle', action="store_true",
+                        help='te Idx is pickled to be loaded in the next run')
     parser.add_argument('--verbose', metavar='verbose', dest='verbose', type=int, nargs='?', default=2,
                         help='Set verbose level. 0: only show critical message, 1: show additional warning message, 2: show process information, 3: show debug messages. DEFAULT:2')
-    parser.add_argument('--version', action='version', version='%(prog)s 1.5.1')
+    parser.add_argument('--version', action='version', version='%(prog)s 1.5.0')
 
     return parser
 
@@ -80,7 +87,7 @@ class UnknownChrom(Exception):
     pass
 
 # Reading files containing alignments (BAM of SAM)
-def count_reads(samples, format, geneIdx, teIdx,stranded, te_mode, sortByPos, prj_name,numItr,fragLength,maxL):
+def count_reads(samples, format, geneIdx, teIdx, intronIdx, stranded, te_mode, sortByPos, prj_name,numItr,fragLength,maxL):
     cnt_tbl = {}
     libsize = []
     # check input files exist or not
@@ -90,7 +97,7 @@ def count_reads(samples, format, geneIdx, teIdx,stranded, te_mode, sortByPos, pr
             sys.exit(1)
     try:
         for filename in samples :
-            (gene_counts,te_instance_counts) = count_transcript_abundance(filename,format,geneIdx,teIdx,stranded,te_mode, sortByPos, prj_name,numItr,fragLength,maxL)
+            (gene_counts,te_instance_counts) = count_transcript_abundance(filename,format,geneIdx,teIdx,intronIdx, stranded,te_mode, sortByPos, prj_name,numItr,fragLength,maxL)
             
             #summarize on elements
             te_ele_counts = teIdx.groupByEle(te_instance_counts)
@@ -143,9 +150,10 @@ def fetch_exon(chrom, st, cigar,direction,format):
 
 
 
-def ovp_annotation(references,multi_reads,geneIdx,teIdx,stranded,format) :
+def ovp_annotation(references,multi_reads,geneIdx,teIdx,intronIdx,stranded,format) :
     annot_gene = []
     annot_TE = []
+    annot_intron = []
 
     #loop over every alignment
     for r1,r2 in multi_reads :
@@ -158,9 +166,11 @@ def ovp_annotation(references,multi_reads,geneIdx,teIdx,stranded,format) :
         chrom1 = ""
         if r1 is not None :
             chrom1 = references[r1.tid]
+            #sys.stderr.write("readname: %s \n" % (r1.query_name))
         chrom2 = ""
         if r2 is not None :
             chrom2 = references[r2.tid]
+            #sys.stderr.write("readname: %s \n" % (r2.query_name))
 
         if stranded == "no":
             direction = 0
@@ -176,11 +186,18 @@ def ovp_annotation(references,multi_reads,geneIdx,teIdx,stranded,format) :
             itv_list2 = fetch_exon(chrom2,r2.pos,r2.cigar,direction,format)
             itv_list.extend(itv_list2)
         try:
+            #print "itv_list ",itv_list
             TEs = teIdx.TE_annotation(itv_list)
+            print "TEs: ",TEs
+            introns = intronIdx.TE_annotation(itv_list)
+            print "introns: ",introns
             genes = geneIdx.Gene_annotation(itv_list)
 
             if len(TEs) > 0   :
                 annot_TE.append(TEs)
+
+            if len(introns) > 0   :
+                annot_intron.append(introns)
 
             if len(genes) > 0 :
                 annot_gene.append(list(set(genes)))
@@ -188,7 +205,7 @@ def ovp_annotation(references,multi_reads,geneIdx,teIdx,stranded,format) :
             sys.stderr.write("Error occurred during read assignments\n")
             raise
 
-    return (annot_gene,annot_TE)
+    return (annot_gene,annot_TE,annot_intron)
 
 
 def readInAlignment(filename, format, sortByPos,prj_name):
@@ -207,13 +224,20 @@ def readInAlignment(filename, format, sortByPos,prj_name):
 
                 cur_time = time.time()
                 bam_tmpfile = '.'+str(cur_time)
-                pysam.sort("-n",filename,bam_tmpfile)
+                sys.stderr.write("INFO  @ %s: \n" % (datetime.datetime.now()))
+                sys.stderr.write("Sorting bam file ......\n")
+                #pysam.sort("-n",filename,bam_tmpfile)
+                sortcommand = "sambamba sort -n %s -o %s.bam 2>> sambamba.err" % (filename, bam_tmpfile)
+                sortproc = subprocess.Popen(sortcommand, stdout=subprocess.PIPE, shell=True)
+                sortproc.wait()
+                sys.stderr.write("INFO  @ %s: \n" % (datetime.datetime.now()))
+                sys.stderr.write("Done sorting bam file ......\n")
                 #samfile = pysam.AlignmentFile(samtools_in.stdout,'r')
                 samfile = pysam.AlignmentFile(bam_tmpfile+".bam",'r')
                 if len(samfile.header) ==0:
                     print >>sys.stderr, "BAM/SAM file has no header section. Exit!"
                     sys.exit(1)
-                subprocess.call(['rm -f ' + bam_tmpfile+'.bam' ],shell=True)
+                #subprocess.call(['rm -f ' + bam_tmpfile+'.bam' ],shell=True)
 
         else :
                 samfile = pysam.AlignmentFile(filename,'r')
@@ -227,7 +251,7 @@ def readInAlignment(filename, format, sortByPos,prj_name):
     return samfile
 
 
-def count_transcript_abundance(filename, format, geneIdx, teIdx, stranded, te_mode, sortByPos, prj_name,numItr,fragLength,maxL):
+def count_transcript_abundance(filename, format, geneIdx, teIdx, intronIdx, stranded, te_mode, sortByPos, prj_name,numItr,fragLength,maxL):
     #read in BAM/SAM file
     samfile = readInAlignment(filename, format, sortByPos,prj_name)
 
@@ -262,28 +286,35 @@ def count_transcript_abundance(filename, format, geneIdx, teIdx, stranded, te_mo
             if aligned_read.is_unmapped or aligned_read.is_duplicate or aligned_read.is_qcfail :
                 continue
            
-            cur_read_name = aligned_read.query_name
-
-            if aligned_read.is_paired :  # this is not reliable if read mate is unmapped
-                added_flag_pos = aligned_read.query_name.find('/')
-                if added_flag_pos == -1 :
-                    added_flag_pos = len(aligned_read.query_name)
-                if aligned_read.query_name.endswith(".1") or aligned_read.query_name.endswith(".2") :
-                    added_flag_pos = len(aligned_read.query_name) - 2
-                
+            added_flag_pos = aligned_read.query_name.find('/')
+            cur_read_name = ""
+            if added_flag_pos == -1 :
+                cur_read_name = aligned_read.query_name
+            else:
                 cur_read_name = aligned_read.query_name[:added_flag_pos]
-                
+            if aligned_read.is_paired :  # this is not reliable if read mate is unmapped
                 paired = True
+                #sys.stderr.write("cur_read_name %s == " % (cur_read_name))
+                #sys.stderr.write("prev_read_name %s \n" % (prev_read_name))
                 if cur_read_name == prev_read_name or prev_read_name == "":
                     prev_read_name = cur_read_name
-                    if aligned_read.is_read1 :
+                    #if aligned_read.is_read1 & (aligned_read.query_name[added_flag_pos+1]=="2"):
+                    #    print "WRONG is_read1", aligned_read
+                    #if aligned_read.is_read2 & (aligned_read.query_name[added_flag_pos+1]=="1"):
+                    #    print "WRONG is_read2", aligned_read
+                    #if aligned_read.is_read1 :
+                    if (aligned_read.query_name[added_flag_pos+1]=="1"):
+                            print "read1:", aligned_read
                             multi_read1.append(aligned_read)
-                    if aligned_read.is_read2 :
+                    #if aligned_read.is_read2 :
+                    if (aligned_read.query_name[added_flag_pos+1]=="2"):
+                            print "read2:", aligned_read
                             multi_read2.append(aligned_read)
                     continue
 
-                else :
+                else : # sort out all reads collected with same name so far
                     if len(multi_read1) <= 1 and len(multi_read2) <= 1 :
+                        #sys.stderr.write("unique read\n")
                         uniq_reads += 1
                         read1 = None
                         read2 = None
@@ -292,19 +323,22 @@ def count_transcript_abundance(filename, format, geneIdx, teIdx, stranded, te_mo
                         if len(multi_read2) == 1:
                             read2 = multi_read2[0]
                         if read1 is not None and read1.is_proper_pair :
+                            #sys.stderr.write("read1 %s " % (read1.query_name))
                             if read2 is None :
                                 sys.stderr.write("******NOT COMPLETE*******\n")
                                 sys.stderr.write("If the BAM file is sorted by coordinates, please specify --sortByPos and re-run!\n")
-                                sys.exit(0)
+                                #sys.exit(0)
+                                continue
                             if tmp_cnt < 10000 :
+                                #sys.stderr.write("read2 %s\n" % (read2.query_name))
                                 pos1 = read1.reference_start
                                 pos2 = read2.reference_start
                                 if abs(pos1-pos2) <= maxL :
-			            avgReadLength += abs(pos1-pos2)+read2.query_length
+                                    avgReadLength += abs(pos1-pos2)+read2.query_length
                                     tmp_cnt += 1
-
-                        alignments_per_read.append((read1,read2))
+                        alignments_per_read.append((read1,read2)) # append paired read to alignments_per_read
                     else :
+                        #sys.stderr.write("non-unique\n") # multiple reads next to each other that are more than one pair 
                         nonunique += 1
                         if te_mode == 'uniq' :
                             empty += 1
@@ -312,25 +346,50 @@ def count_transcript_abundance(filename, format, geneIdx, teIdx, stranded, te_mo
                             multi_read1 = []
                             multi_read2 = []
                             prev_read_name = cur_read_name
-                            if aligned_read.is_read1 :
+                            #if aligned_read.is_read1 :
+                            if (aligned_read.query_name[added_flag_pos+1]=="1"):
                                 multi_read1.append(aligned_read)
-                            if aligned_read.is_read2 :
+                            #if aligned_read.is_read2 :
+                            if (aligned_read.query_name[added_flag_pos+1]=="2"):
                                 multi_read2.append(aligned_read)
                             continue
 
                         else:
-                            #singlton
-                            if len(multi_read2) == 0 :
-                                for r in multi_read1 :
-                                    alignments_per_read.append((r,None))
-                            if len(multi_read1) == 0:
-                                for r in multi_read2 :
-                                    alignments_per_read.append((None,r))
-                            if len(multi_read2) == len(multi_read1) :
-                              for i in range(len(multi_read1)) :
-                                read1 = multi_read1[i]
-                                read2 = multi_read2[i]
-                                alignments_per_read.append((read1,read2))
+                            #sys.stderr.write("save alignments per read\n")
+                            print "multi_read1: ", len(multi_read1)
+                            print "multi_read2: ", len(multi_read2)
+                          
+                            larger_cnt =  max(len(multi_read1), len(multi_read2))
+                            print larger_cnt
+                            for c in range(larger_cnt): 
+                                #singlton
+                                if len(multi_read2) == 0 :
+                                    #for r in multi_read1 :
+                                    #    alignments_per_read.append((r,None))
+                                    r1 = multi_read1.pop(0)
+                                    alignments_per_read.append((r1,None))
+                                    print "r1 appended"
+                                elif len(multi_read1) == 0:
+                                    #for r in multi_read2 :
+                                    #    alignments_per_read.append((None,r))
+                                    r2 = multi_read2.pop(0)
+                                    alignments_per_read.append((None, r2))
+                                    print "r2 appended"
+                                #if len(multi_read2) == len(multi_read1) :
+                                #    for i in range(len(multi_read1)) :
+                                #      read1 = multi_read1[i]
+                                #      read2 = multi_read2[i]
+                                #      alignments_per_read.append((read1,read2))
+                                else: 
+                                    r1 = multi_read1.pop(0)
+                                    r2 = multi_read2.pop(0)
+                                    alignments_per_read.append((r1,r2))
+                                    print "r1 r2 appended"
+
+                            print "SAVED ALL COLLECTED READS"
+                            for r1,r2 in alignments_per_read :
+                                print "r1: ", r1
+                                print "r2: ", r2
 
 
             else : #single end read
@@ -346,6 +405,7 @@ def count_transcript_abundance(filename, format, geneIdx, teIdx, stranded, te_mo
                         if len(alignments_per_read) == 1 :
                             uniq_reads += 1
                         else :
+                            #sys.stderr.write("non-unique\n")
                             nonunique += 1
                             if te_mode == 'uniq' : #ignore multi-reads
                                 empty += 1
@@ -355,21 +415,27 @@ def count_transcript_abundance(filename, format, geneIdx, teIdx, stranded, te_mo
                                 continue
             try :
 
-                (annot_gene,annot_TE) = ovp_annotation(references,alignments_per_read, geneIdx, teIdx,stranded,format)
+                (annot_gene,annot_TE,annot_intron) = ovp_annotation(references,alignments_per_read, geneIdx, teIdx, intronIdx, stranded,format)
 
-                if len(alignments_per_read) > 1 : #multi read, prior to TE
-                    no_annot_te = parse_annotations_TE(multi_reads,annot_TE, te_counts, te_multi_counts, leftOver_te)
+                if len(alignments_per_read) > 1 : #multi read, priority to TE
+                    print "multiple alignments per read" 
+                    for r1,r2 in alignments_per_read :
+                        print "r1: ", r1
+                        print "r2: ", r2
+                    no_annot_te = parse_annotations_TE(multi_reads,annot_TE, annot_intron, te_counts, te_multi_counts, leftOver_te)
 
                     if no_annot_te :
                         no_annot_gene = parse_annotations_gene(annot_gene,gene_counts,leftOver_gene)
                         if no_annot_gene :
+                            #sys.stderr.write("unannotated\n")
                             empty += 1
 
-                else : #uniq read , prior to gene
+                else : #uniq read , priority to gene
                     no_annot_gene = parse_annotations_gene(annot_gene,gene_counts,leftOver_gene)
                     if no_annot_gene :
-                        no_annot_te = parse_annotations_TE(multi_reads,annot_TE, te_counts, te_multi_counts, leftOver_te)
+                        no_annot_te = parse_annotations_TE(multi_reads,annot_TE, annot_intron, te_counts, te_multi_counts, leftOver_te)
                         if no_annot_te :
+                            #sys.stderr.write("unannotated\n")
                             empty += 1
 
 
@@ -387,9 +453,11 @@ def count_transcript_abundance(filename, format, geneIdx, teIdx, stranded, te_mo
             if not aligned_read.is_paired :
                 alignments_per_read.append((aligned_read,None))
             else :
-                if aligned_read.is_read1 :
+                #if aligned_read.is_read1 :
+                if (aligned_read.query_name[added_flag_pos+1]=="1"):
                     multi_read1.append(aligned_read)
-                if aligned_read.is_read2 :
+                #if aligned_read.is_read2 :
+                if (aligned_read.query_name[added_flag_pos+1]=="2"):
                     multi_read2.append(aligned_read)
 
     except StopIteration:
@@ -496,7 +564,8 @@ def resolve_annotation_ambiguity(counts, leftOvers ) :
                 counts[a] = ww/len(readslist)
 
 
-def parse_annotations_TE(multi_reads,annot_TE,uniq_counts,multi_counts, leftOver_list):
+# need to add intron annotation
+def parse_annotations_TE(multi_reads,annot_TE,annot_intron, uniq_counts,multi_counts, leftOver_list):
     if len(annot_TE) == 0 :
         return True
 
@@ -682,6 +751,9 @@ def write_R_code(f_cnt_tbl, tfiles, cfiles, prj_name, norm, pval, fc, rpm_val,mi
 
     return rscript
 
+
+
+
 # Main function of script
 def main():
     """Start TEtranscripts......parse options......"""
@@ -704,23 +776,76 @@ def main():
     info("Done building gene index ......\n")
     #TE index
     try :
-
         teIdx = TEfeatures()
         cur_time = time.time()
         te_tmpfile = '.'+str(cur_time)+'.te.gtf'
-        subprocess.call(['sort -k 1,1 -k 4,4g '+ args.tefile+ ' >'+ te_tmpfile],shell=True )
-        info("\nBuilding TE index .......\n")
-        teIdx.build(te_tmpfile,args.te_mode)
-        subprocess.call(['rm -f ' + te_tmpfile ],shell=True)
-        info("Done building TE index ......\n")
+        if (args.b_pickle): 
+            te_picklefile = '.te.HI.pickle.2.7'
+            if os.path.isfile(te_picklefile) and os.path.getsize(te_picklefile) > 0:
+                info("\nLoading TE pickle .......\n")
+                with open(te_picklefile, 'rb') as fp:
+                    gc.disable()    # disable garbage collector
+                    teIdx = pickle.load(fp)
+                    gc.enable()
+                info("\nDone loading TE pickle .......\n")
+            else:
+                info("\nBuilding TE index .......\n")
+                #subprocess.call(['sort -k 1,1 -k 4,4g '+ args.tefile+ ' >'+ te_tmpfile],shell=True )
+                #teIdx.build(te_tmpfile,args.te_mode)
+                teIdx.build(args.tefile,args.te_mode)
+                #subprocess.call(['rm -f ' + te_tmpfile ],shell=True)
+                info("Done building TE index ......\n")
+                info("\nDumping TE pickle .......\n")
+                with open(te_picklefile, 'wb') as fp:
+                    pickle.dump(teIdx, fp, protocol=pickle.HIGHEST_PROTOCOL)
+                info("\nDone dumping TE pickle .......\n")
+        else: 
+            info("\nBuilding TE index .......\n")
+            #subprocess.call(['sort -k 1,1 -k 4,4g '+ args.tefile+ ' >'+ te_tmpfile],shell=True )
+            #teIdx.build(te_tmpfile,args.te_mode)
+            teIdx.build(args.tefile,args.te_mode)
+            #subprocess.call(['rm -f ' + te_tmpfile ],shell=True)
+            info("Done building TE index ......\n")
     except :
-        sys.stderr.write("Error in building gene/TE index \n")
+        sys.stderr.write("Error in building TE index \n")
         sys.exit(1)
+
+    #TEflanking introns index
+    try :
+        intronIdx = TEfeatures()
+        cur_time = time.time()
+        if (args.b_pickle): 
+            intron_picklefile = '.intron.HI.pickle.2.7'
+            if os.path.isfile(intron_picklefile) and os.path.getsize(intron_picklefile) > 0:
+                info("\nLoading intron pickle .......\n")
+                with open(intron_picklefile, 'rb') as fp:
+                    gc.disable()    # disable garbage collector
+                    intronIdx = pickle.load(fp)
+                    gc.enable()
+                info("\nDone loading intron pickle .......\n")
+            else:
+                info("\nBuilding inton index .......\n")
+                intronIdx.build_introns(args.intronfile,args.te_mode)
+                info("Done building intron index ......\n")
+                info("\nDumping intron pickle .......\n")
+                with open(intron_picklefile, 'wb') as fp:
+                    pickle.dump(intronIdx, fp, protocol=pickle.HIGHEST_PROTOCOL)
+                info("\nDone dumping intron pickle .......\n")
+        else: 
+            info("\nBuilding intron index .......\n")
+            intronIdx.build(args.intronfile,args.te_mode)
+            info("Done building intron index ......\n")
+    except :
+        sys.stderr.write("Error in building intron flanking intron index \n")
+        sys.exit(1)
+ 
+
+
     # Read sample files make count table
     info("\nReading sample files ...\n")
 
-    (tsamples_tbl, tsamples_rpm) = count_reads(args.tfiles, args.parser, geneIdx, teIdx, args.stranded, args.te_mode, args.sortByPos, args.prj_name,args.numItr,args.fragLength,args.maxL)
-    (csamples_tbl, csamples_rpm) = count_reads(args.cfiles, args.parser, geneIdx, teIdx, args.stranded, args.te_mode, args.sortByPos, args.prj_name,args.numItr,args.fragLength,args.maxL)
+    (tsamples_tbl, tsamples_rpm) = count_reads(args.tfiles, args.parser, geneIdx, teIdx, intronIdx, args.stranded, args.te_mode, args.sortByPos, args.prj_name,args.numItr,args.fragLength,args.maxL)
+    (csamples_tbl, csamples_rpm) = count_reads(args.cfiles, args.parser, geneIdx, teIdx, intronIdx, args.stranded, args.te_mode, args.sortByPos, args.prj_name,args.numItr,args.fragLength,args.maxL)
     
     info("Finished processing sample files")
 
@@ -730,6 +855,7 @@ def main():
     output_count_tbl(tsamples_tbl, csamples_tbl, f_cnt_tbl)
     rpm_val = tsamples_rpm + csamples_rpm
 
+    sys.exit(0)
     #info("Calculating differential expression ...\n")
     # Obtaining R-code for differential analysis
 
