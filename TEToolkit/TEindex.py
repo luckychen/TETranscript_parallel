@@ -260,6 +260,8 @@ class TEfeatures:
     def __init__ (self):
 
         self.indexlist = {}
+        self._start = []
+        self._end = []
         self._length = []
         self._nameIDmap = []
         self._elements = []
@@ -295,6 +297,18 @@ class TEfeatures:
             return None
         else :
             return self._nameIDmap[idx]
+
+    def getStart(self,TE_name_idx) :
+        if TE_name_idx < len(self._start) :
+            return self._start[TE_name_idx]
+        else :
+            return -1
+
+    def getEnd(self,TE_name_idx) :
+        if TE_name_idx < len(self._end) :
+            return self._end[TE_name_idx]
+        else :
+            return -1
 
     def getLength(self,TE_name_idx) :
         if TE_name_idx < len(self._length) :
@@ -466,6 +480,8 @@ class TEfeatures:
                 if ele_name not in self._elements :
                     self._elements.append(ele_name)
 
+                self._start.append(start)
+                self._end.append(end)
                 self._length.append(tlen)
                 self._nameIDmap.append(full_name)
 
@@ -501,6 +517,9 @@ class TEfeatures:
 
             f.close()
 
+
+####################################
+#intron annotation
 
     def build_introns (self,filename,te_mode):
             self.__srcfile = filename
@@ -560,6 +579,8 @@ class TEfeatures:
                     if ele_name not in self._elements :
                         self._elements.append(ele_name)
 
+                self._start.append(start)
+                self._end.append(end)
                 self._length.append(tlen)
                 self._nameIDmap.append(full_name)
 
@@ -594,6 +615,64 @@ class TEfeatures:
                 name_idx += 1
 
             f.close()
+
+    
+    def findOvpIntron(self,chrom,start,end):
+        startbinID = start/TEindex_BINSIZE
+        endbinID = end/TEindex_BINSIZE
+        if start == startbinID * TEindex_BINSIZE :
+           startbinID -= 1
+        name_idx_list = []
+
+        if  self.indexlist.has_key(chrom) :
+               index = self.indexlist[chrom]
+        else :
+            return None
+
+        (LBnode,RBnode) = index.lookup_r(startbinID,endbinID,index.root)
+
+        if LBnode is not None :
+            intronlist = LBnode.overlaps(start,end)
+            name_idx_list.extend(intronlist)
+
+        if RBnode is not None :
+            intronlist = RBnode.overlaps(start,end)
+            name_idx_list.extend(intronlist)
+
+        return name_idx_list
+
+    def get_flankingTE(self,intron_idx):
+        intron_name = self.getFullName(intron_idx)
+        pos = intron_name.find(':')
+        val = intron_name[:pos]
+        pos = val.rfind('_')        
+        te_name = val[:pos]
+        direction = val[pos+1:]
+        print te_name, " ", direction
+
+
+    def intron_annotation(self,iv_seq):
+        introns = []
+        for iv in iv_seq :
+            chromo = iv[0]
+            start = iv[1]
+            end = iv[2]
+            strand = iv[3]
+            name_idx_list  = self.findOvpIntron(chromo,start,end)
+
+            if name_idx_list is not None :
+                for t in name_idx_list :
+                    if strand != "." : #stranded
+                        if strand == self.getStrand(t)  :
+                            if t not in introns :
+                                print self.getFullName(t)
+                                self.get_flankingTE(t)
+                                introns.append(t)
+                    else :#not stranded
+                        if t not in introns :
+                            introns.append(t)
+
+        return introns
 
 
 
