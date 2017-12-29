@@ -101,9 +101,10 @@ def count_reads(samples, format, geneIdx, teIdx, intronIdx, stranded, te_mode, s
             
             #summarize on elements
             te_ele_counts = teIdx.groupByEle(te_instance_counts)
+            intron_ele_counts = intronIdx.groupByEle(intron_counts)
             # save gene counts and TE counts into count table
-            cnt_tbl[filename] = dict(gene_counts.items() + te_ele_counts.items())
-            num_reads = sum(gene_counts.values())+sum(te_ele_counts.values())
+            cnt_tbl[filename] = dict(gene_counts.items() + te_ele_counts.items() + intron_ele_counts.items())
+            num_reads = sum(gene_counts.values())+sum(te_ele_counts.values())+sum(intron_ele_counts.values())
             libsize.append(num_reads)
     except:
         sys.stderr.write("Error: %s\n" % str(sys.exc_info()[1]))
@@ -187,21 +188,24 @@ def ovp_annotation(references,alignments_per_read,geneIdx,teIdx,intronIdx,strand
             itv_list2 = fetch_exon(chrom2,r2.pos,r2.cigar,direction,format)
             itv_list.extend(itv_list2)
         try:
-            #print "itv_list ",itv_list
+            print "itv_list ",itv_list
             TEs = teIdx.TE_annotation(itv_list)
             print "TEs: ",TEs
             introns = intronIdx.intron_annotation(itv_list)
             print "introns: ",introns
             genes = geneIdx.Gene_annotation(itv_list)
+            print "genes: ",genes
 
             if len(TEs) > 0   :
-                annot_TE.append(TEs)  # annot_TE: 2-dim array; 1-dim=alignment 2-dim=overlapping te idx for each interval
+                annot_TE.append(TEs)  # annot_TE: 2-dim array; 1-dim=alignment 2-dim=overlapping_te_idx for each interval
+                # changed into a 3-dim array with additional dim of [te_idx, ovp_len]
 
             if len(introns) > 0   :
                 annot_intron.append(introns)
 
-            if len(genes) > 0 :
-                annot_gene.append(list(set(genes)))
+            if len(genes) > 0 :     
+                #annot_gene.append(list(set(genes)))
+                annot_gene.append(genes)
         except:
             sys.stderr.write("Error occurred during read assignments\n")
             raise
@@ -425,10 +429,10 @@ def count_transcript_abundance(filename, format, geneIdx, teIdx, intronIdx, stra
                     for r1,r2 in alignments_per_read :
                         print "r1: ", r1
                         print "r2: ", r2
-                    no_annot_te = parse_annotations_TE(multi_reads_te,annot_TE, annot_intron, te_counts, te_multi_counts, leftOver_te)
+                    no_annot_te = parse_annotations_TE(multi_reads_te,annot_TE, te_counts, te_multi_counts, leftOver_te)
 
                     if no_annot_te :
-                        no_annot_intron = parse_annotations_intron(multi_reads_intron,annot_TE, annot_intron, intron_counts, intron_multi_counts, leftOver_intron)
+                        no_annot_intron = parse_annotations_intron(multi_reads_intron, annot_intron, intron_counts, intron_multi_counts, leftOver_intron)
                         if no_annot_intron :
                             no_annot_gene = parse_annotations_gene(annot_gene,gene_counts,leftOver_gene)
                             if no_annot_gene :
@@ -438,9 +442,9 @@ def count_transcript_abundance(filename, format, geneIdx, teIdx, intronIdx, stra
                 else : #uniq read , priority to gene
                     no_annot_gene = parse_annotations_gene(annot_gene,gene_counts,leftOver_gene)
                     if no_annot_gene :
-                        no_annot_te = parse_annotations_TE(multi_reads_te,annot_TE, annot_intron, te_counts, te_multi_counts, leftOver_te)
+                        no_annot_te = parse_annotations_TE(multi_reads_te,annot_TE, te_counts, te_multi_counts, leftOver_te)
                         if no_annot_te :
-                            no_annot_intron = parse_annotations_intron(multi_reads_intron,annot_TE, annot_intron, intron_counts, intron_multi_counts, leftOver_intron)
+                            no_annot_intron = parse_annotations_intron(multi_reads_intron, annot_intron, intron_counts, intron_multi_counts, leftOver_intron)
                             if no_annot_intron :
                                 #sys.stderr.write("unannotated\n")
                                 empty += 1
@@ -451,7 +455,7 @@ def count_transcript_abundance(filename, format, geneIdx, teIdx, intronIdx, stra
                 raise
 
             if i % 1000000 == 0 :
-                    sys.stderr.write("%d %s processed.\n" % (i, "alignments " ))
+                sys.stderr.write("%d %s processed.\n" % (i, "alignments " ))
 
             alignments_per_read = []
             multi_read1 = []
@@ -560,26 +564,29 @@ def count_transcript_abundance(filename, format, geneIdx, teIdx, intronIdx, stra
 
 
 def parse_annotations_gene(annot_gene, gene_counts,leftOver_gene):
-        no_annot = True
+    print "parsing gene annotations "
+    no_annot = True
 
-        if len(annot_gene) > 1 :
-            leftOver_gene.append((annot_gene,1.0))
-                # if te_mode == "uniq" :
-                #return no_annot
-        elif len(annot_gene) == 1 :
-            genes = annot_gene[0]
-            if len(genes) == 1 :
-                gene_counts[genes[0]] += 1
-            else :
-                if genes[0] == genes[1] :
-                    gene_counts[genes[0]] += 1
-                else :
-                    gene_counts[genes[0]] += 0.5
-                    gene_counts[genes[1]] += 0.5
+    print "len(annot_gene) ", len(annot_gene)
+    if len(annot_gene) > 1 :
+        leftOver_gene.append((annot_gene,1.0))
+            # if te_mode == "uniq" :
+            #return no_annot
+    elif len(annot_gene) == 1 :
+        genes = annot_gene[0]
+        print "genes: ",genes
+        if len(genes) == 1 :
+            gene_counts[genes[0][0]] += 1
         else :
-            return True
+            if genes[0][0] == genes[1][0] :
+                gene_counts[genes[0][0]] += 1
+            else :
+                gene_counts[genes[0][0]] += 0.5
+                gene_counts[genes[1][0]] += 0.5
+    else :
+        return True
 
-        return False
+    return False
 
 # Assign ambiguous genic reads mapped to a location with multiple annotations
 def resolve_annotation_ambiguity(counts, leftOvers ) : # w is weight?
@@ -591,8 +598,10 @@ def resolve_annotation_ambiguity(counts, leftOvers ) : # w is weight?
         if size > 1:
             ww = ww/size
 
+        print annlist
         for ann in annlist :
-            for a in ann:
+            print ann
+            for (a,ovp_len) in ann:
                 if a not in readslist :
                     readslist[a] = counts[a]
                     total += counts[a]
@@ -606,7 +615,8 @@ def resolve_annotation_ambiguity(counts, leftOvers ) : # w is weight?
                 counts[a] = ww/len(readslist)
 
 
-def parse_annotations_TE(multi_reads,annot_TE,annot_intron, uniq_counts,multi_counts, leftOver_list):
+def parse_annotations_TE(multi_reads, annot_TE, uniq_counts, multi_counts, leftOver_list):
+    print "parsing TE annotations "
     if len(annot_TE) == 0 :
         return True
     
@@ -616,7 +626,7 @@ def parse_annotations_TE(multi_reads,annot_TE,annot_intron, uniq_counts,multi_co
 
     if len(annot_TE) == 1 and len(annot_TE[0]) == 1 :
         print annot_TE[0][0]
-        uniq_counts[annot_TE[0][0]] += 1
+        uniq_counts[annot_TE[0][0][0]] += 1
 
     if len(annot_TE) == 1 and len(annot_TE[0]) > 1 :
         for i in range(len(annot_TE[0])):
@@ -626,10 +636,10 @@ def parse_annotations_TE(multi_reads,annot_TE,annot_intron, uniq_counts,multi_co
     if len(annot_TE) > 1:
             multi_algn = []
             for i in range(len(annot_TE)):
-                for te in annot_TE[i] :
-                    print te
-                    multi_counts[te] += 1.0 / (len(annot_TE) * len(annot_TE[i]))
-                    multi_algn.append(te)
+                for (te_idx, ovp_len) in annot_TE[i] :
+                    print te_idx, " ", ovp_len
+                    multi_counts[te_idx] += 1.0 / (len(annot_TE) * len(annot_TE[i]))
+                    multi_algn.append(te_idx)
 
             multi_reads.append(multi_algn)
 
@@ -637,11 +647,10 @@ def parse_annotations_TE(multi_reads,annot_TE,annot_intron, uniq_counts,multi_co
     return False
 
 
-# need to add intron annotation
-# add function parse_annotations_intron
 # save intron counts for uniq_counts, multi_count and leftOvers
 # later discount the TE counts by the read depth ratios of intron counts vs TE counts.
-def parse_annotations_intron(multi_reads,annot_TE,annot_intron, uniq_counts,multi_counts, leftOver_list):
+def parse_annotations_intron(multi_reads,annot_intron, uniq_counts,multi_counts, leftOver_list):
+    print "parsing intron annotations "
     if len(annot_intron) == 0 :
         return True
 
@@ -650,20 +659,20 @@ def parse_annotations_intron(multi_reads,annot_TE,annot_intron, uniq_counts,mult
 
     if len(annot_intron) == 1 and len(annot_intron[0]) == 1 :
         print annot_intron[0][0]
-        #uniq_counts[annot_intron[0][0]] += 1
+        uniq_counts[annot_intron[0][0][0]] += 1
 
     if len(annot_intron) == 1 and len(annot_intron[0]) > 1 :
         for i in range(len(annot_intron[0])):
             print annot_intron[0][i]
-        #leftOver_list.append((annot_intron,1.0))
+        leftOver_list.append((annot_intron,1.0))
 
     if len(annot_intron) > 1:
             multi_algn = []
             for i in range(len(annot_intron)):
-                for intron in annot_intron[i] :
-                    print intron
-                    multi_counts[intron] += 1.0 / (len(annot_intron) * len(annot_intron[i]))
-                    multi_algn.append(intron)
+                for (intron_idx, ovp_len) in annot_intron[i] :
+                    print intron_idx, " ", ovp_len
+                    multi_counts[intron_idx] += 1.0 / (len(annot_intron) * len(annot_intron[i]))
+                    multi_algn.append(intron_idx)
 
             multi_reads.append(multi_algn)
 

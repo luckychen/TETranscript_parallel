@@ -70,8 +70,8 @@ class Node :
             eles = self.__namelist[s]
             for name, e in eles :
                 if start <= e and end >= s :
-                    print name, start, end, s, e;
-                    TEnamelist.append(name)
+                    print "overlaps: ", start, " ", end, " idx=", name, " ", s, " ", e, "len: ", end-s
+                    TEnamelist.append([name,min(end,e)-max(start,s)])
 
         return TEnamelist
         #if start < self.__end and end >= self.__start :
@@ -336,7 +336,7 @@ class TEfeatures:
 
     # looks up the TE index interval tree with start end, 
     # find the nodes corresponding to the intervals 
-    # returns all overlapping TE names within the node
+    # returns all overlapping TE name indices within the node
 
     def findOvpTE(self,chrom,start,end):
         startbinID = start/TEindex_BINSIZE
@@ -370,17 +370,22 @@ class TEfeatures:
             end = iv[2]
             strand = iv[3]
             name_idx_list  = self.findOvpTE(chromo,start,end)
+            print "name_idx_list: ", name_idx_list
 
             if name_idx_list is not None :
-                for t in name_idx_list :
+                for (t,ovp_len) in name_idx_list :
                     if strand != "." : #stranded
                         if strand == self.getStrand(t)  :
                             if t not in TEs :
-                                print self.getFullName(t)
-                                TEs.append(t)
+                                print self.getFullName(t), " appended"
+                                TEs.append([t,ovp_len])
+                            else:
+                                print self.getFullName(t), " already in the list" 
+                        else: 
+                            print "strand ", strand, " != ", self.getStrand(t)
                     else :#not stranded
                         if t not in TEs :
-                            TEs.append(t)
+                            TEs.append([t,ovp_len])
 
         return TEs
 
@@ -659,18 +664,23 @@ class TEfeatures:
             end = iv[2]
             strand = iv[3]
             name_idx_list  = self.findOvpIntron(chromo,start,end)
+            print "name_idx_list: ", name_idx_list
 
             if name_idx_list is not None :
-                for t in name_idx_list :
+                for (t,ovp_len) in name_idx_list :
                     if strand != "." : #stranded
                         if strand == self.getStrand(t)  :
                             if t not in introns :
-                                print self.getFullName(t)
+                                print self.getFullName(t), " appended"
                                 self.get_flankingTE(t)
-                                introns.append(t)
+                                introns.append([t,ovp_len])
+                            else:
+                                print self.getFullName(t), " already in introns"
+                        else:
+                            print "strand ", strand, " != ", self.getStrand(t)
                     else :#not stranded
                         if t not in introns :
-                            introns.append(t)
+                            introns.append([t,ovp_len])
 
         return introns
 

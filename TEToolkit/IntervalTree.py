@@ -94,9 +94,14 @@ class IntervalTree(object):
 
     def find_gene(self, start, stop):
         """find all elements between (or overlapping) start and stop"""
+        overlapping = []
         if self.intervals and not stop < self.intervals[0].start:
-            overlapping = [i.gene for i in self.intervals if i.stop >= start 
-                                                    and i.start <= stop]
+            #overlapping = [i.gene for i in self.intervals if i.stop >= start 
+            #                                        and i.start <= stop]
+            for i in self.intervals: 
+                if i.stop >= start and i.start <= stop:
+                    print "find_gene: ", start, " ", stop, " ", i.gene, " ", i.start, " ", i.stop
+                    overlapping.append([i.gene, min(stop,i.stop)-max(start,i.start)])
         else:
             overlapping = []
 
