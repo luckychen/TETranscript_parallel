@@ -868,70 +868,70 @@ def main():
     geneIdx = GeneFeatures(args.gtffile,args.stranded,"exon","gene_id")
     info("Done building gene index ......\n")
     #TE index
-    try :
-        teIdx = TEfeatures()
-        cur_time = time.time()
-        te_tmpfile = '.'+str(cur_time)+'.te.gtf'
-        if (args.b_pickle): 
-            te_picklefile = '.te.HI.pickle.2.7'
-            if os.path.isfile(te_picklefile) and os.path.getsize(te_picklefile) > 0:
-                info("\nLoading TE pickle .......\n")
-                with open(te_picklefile, 'rb') as fp:
-                    gc.disable()    # disable garbage collector
-                    teIdx = pickle.load(fp)
-                    gc.enable()
-                info("\nDone loading TE pickle .......\n")
-            else:
-                info("\nBuilding TE index .......\n")
-                #subprocess.call(['sort -k 1,1 -k 4,4g '+ args.tefile+ ' >'+ te_tmpfile],shell=True )
-                #teIdx.build(te_tmpfile,args.te_mode)
-                teIdx.build(args.tefile,args.te_mode)
-                #subprocess.call(['rm -f ' + te_tmpfile ],shell=True)
-                info("Done building TE index ......\n")
-                info("\nDumping TE pickle .......\n")
-                with open(te_picklefile, 'wb') as fp:
-                    pickle.dump(teIdx, fp, protocol=pickle.HIGHEST_PROTOCOL)
-                info("\nDone dumping TE pickle .......\n")
-        else: 
+#try :
+    teIdx = TEfeatures()
+    cur_time = time.time()
+    te_tmpfile = '.'+str(cur_time)+'.te.gtf'
+    if (args.b_pickle): 
+        te_picklefile = '.te.HI.pickle.2.7'
+        if os.path.isfile(te_picklefile) and os.path.getsize(te_picklefile) > 0:
+            info("\nLoading TE pickle .......\n")
+            with open(te_picklefile, 'rb') as fp:
+                gc.disable()    # disable garbage collector
+                teIdx = pickle.load(fp)
+                gc.enable()
+            info("\nDone loading TE pickle .......\n")
+        else:
             info("\nBuilding TE index .......\n")
             #subprocess.call(['sort -k 1,1 -k 4,4g '+ args.tefile+ ' >'+ te_tmpfile],shell=True )
             #teIdx.build(te_tmpfile,args.te_mode)
             teIdx.build(args.tefile,args.te_mode)
             #subprocess.call(['rm -f ' + te_tmpfile ],shell=True)
             info("Done building TE index ......\n")
-    except :
-        sys.stderr.write("Error in building TE index \n")
-        sys.exit(1)
+            info("\nDumping TE pickle .......\n")
+            with open(te_picklefile, 'wb') as fp:
+                pickle.dump(teIdx, fp, protocol=pickle.HIGHEST_PROTOCOL)
+            info("\nDone dumping TE pickle .......\n")
+    else: 
+        info("\nBuilding TE index .......\n")
+        #subprocess.call(['sort -k 1,1 -k 4,4g '+ args.tefile+ ' >'+ te_tmpfile],shell=True )
+        #teIdx.build(te_tmpfile,args.te_mode)
+        teIdx.build(args.tefile,args.te_mode)
+        #subprocess.call(['rm -f ' + te_tmpfile ],shell=True)
+        info("Done building TE index ......\n")
+#except :
+#    sys.stderr.write("Error in building TE index \n")
+#    sys.exit(1)
 
     #TEflanking introns index
-    try :
-        intronIdx = TEfeatures()
-        cur_time = time.time()
-        if (args.b_pickle): 
-            intron_picklefile = '.intron.HI.pickle.2.7'
-            if os.path.isfile(intron_picklefile) and os.path.getsize(intron_picklefile) > 0:
-                info("\nLoading intron pickle .......\n")
-                with open(intron_picklefile, 'rb') as fp:
-                    gc.disable()    # disable garbage collector
-                    intronIdx = pickle.load(fp)
-                    gc.enable()
-                info("\nDone loading intron pickle .......\n")
-            else:
-                info("\nBuilding inton index .......\n")
-                intronIdx.build_introns(args.intronfile,args.te_mode)
-                info("Done building intron index ......\n")
-                info("\nDumping intron pickle .......\n")
-                with open(intron_picklefile, 'wb') as fp:
-                    pickle.dump(intronIdx, fp, protocol=pickle.HIGHEST_PROTOCOL)
-                info("\nDone dumping intron pickle .......\n")
-        else: 
+#try :
+    intronIdx = IntronFeatures(teIdx)
+    cur_time = time.time()
+    if (args.b_pickle): 
+        intron_picklefile = '.intron.HI.pickle.2.7'
+        if os.path.isfile(intron_picklefile) and os.path.getsize(intron_picklefile) > 0:
+            info("\nLoading intron pickle .......\n")
+            with open(intron_picklefile, 'rb') as fp:
+                gc.disable()    # disable garbage collector
+                intronIdx = pickle.load(fp)
+                gc.enable()
+            info("\nDone loading intron pickle .......\n")
+        else:
             info("\nBuilding intron index .......\n")
             intronIdx.build(args.intronfile,args.te_mode)
             info("Done building intron index ......\n")
-    except :
-        sys.stderr.write("Error in building intron flanking intron index \n")
-        sys.exit(1)
- 
+            info("\nDumping intron pickle .......\n")
+            with open(intron_picklefile, 'wb') as fp:
+                pickle.dump(intronIdx, fp, protocol=pickle.HIGHEST_PROTOCOL)
+            info("\nDone dumping intron pickle .......\n")
+    else: 
+        info("\nBuilding intron index .......\n")
+        intronIdx.build(args.intronfile,args.te_mode)
+        info("Done building intron index ......\n")
+#except :
+#    sys.stderr.write("Error in building intron flanking intron index \n")
+#    sys.exit(1)
+
 
 
     # Read sample files make count table

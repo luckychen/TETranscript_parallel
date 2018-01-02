@@ -260,24 +260,53 @@ class TEfeatures:
     def __init__ (self):
 
         self.indexlist = {}
-        self._start = []
-        self._end = []
         self._length = []
         self._nameIDmap = []
         self._elements = []
+        self._leftIntronIDmap = [] 
+        self._rightIntronIDmap = [] 
 
     def getNames(self) :
         names = []
         return self._nameIDmap
+
     def numInstances(self) :
         return len(self._nameIDmap)
 
     def getElements(self) :
          return self._elements
 
+    def initLeftIntronIDmap(self,maxSize) :
+        self._leftIntronIDmap = [None]*maxSize
+
+    def initRightIntronIDmap(self,maxSize) :
+        self._rightIntronIDmap = [None]*maxSize
+
+    def getLeftIntronIdx(self,idx) :
+        return self._leftIntronIDmap[idx]
+
+    def getRightIntronIdx(self,idx) :
+        return self._rightIntronIDmap[idx]
+
+    def setLeftIntronIdx(self,idx, val) :
+        self._leftIntronIDmap[idx] = val
+
+    def setRightIntronIdx(self,idx, val) :
+        self._rightIntronIDmap[idx] = val
+
     def getStrand(self,idx) :
         f_name = self._nameIDmap[idx]
         return f_name[len(f_name)-1]
+
+    def getInstanceName(self,idx) :
+        if idx >= len(self._nameIDmap) or idx < 0 :
+            return None
+        else :
+            full_name =  self._nameIDmap[idx]
+            pos = full_name.find(':')
+            val = full_name[:pos]
+            return val
+
 
     def getEleName(self,idx) :
         full_name = None
@@ -297,18 +326,6 @@ class TEfeatures:
             return None
         else :
             return self._nameIDmap[idx]
-
-    def getStart(self,TE_name_idx) :
-        if TE_name_idx < len(self._start) :
-            return self._start[TE_name_idx]
-        else :
-            return -1
-
-    def getEnd(self,TE_name_idx) :
-        if TE_name_idx < len(self._end) :
-            return self._end[TE_name_idx]
-        else :
-            return -1
 
     def getLength(self,TE_name_idx) :
         if TE_name_idx < len(self._length) :
@@ -428,8 +445,8 @@ class TEfeatures:
 #            else :
 #                sys.stderr.write("TE inconsistency! "+name+"\n")
 #                sys.exit(1)
-
-        return te_name_counts
+#
+#        return te_name_counts
 
     def build (self,filename,te_mode):
             self.__srcfile = filename
@@ -485,9 +502,8 @@ class TEfeatures:
                 if ele_name not in self._elements :
                     self._elements.append(ele_name)
 
-                self._start.append(start)
-                self._end.append(end)
                 self._length.append(tlen)
+                assert len(self._nameIDmap) == name_idx
                 self._nameIDmap.append(full_name)
 
                 if self.indexlist.has_key(chrom) :
@@ -521,105 +537,198 @@ class TEfeatures:
                 name_idx += 1
 
             f.close()
+
+
+
+
+
 
 
 ####################################
 #intron annotation
 
-    def build_introns (self,filename,te_mode):
-            self.__srcfile = filename
+class IntronFeatures(TEfeatures, object):
+    """index of intron annotations flanking TEs.
+    """
+    def __init__(self, TEidx):
+        self._start = []
+        self._end = []
+        self._TEidx = TEidx # TEfeatures idx object needs to be created already
+        self._left2TEIDmap = []
+        self._right2TEIDmap = []
 
-            try:
-                f = open(self.__srcfile,'r')
-            except:
-                logging.error("cannot open such file %s !\n" %(self.__srcfile))
-                sys.exit(1)
+        super(IntronFeatures, self).__init__()
+        self._TEidx.initLeftIntronIDmap(self._TEidx.numInstances()*2+2)
+        self._TEidx.initRightIntronIDmap(self._TEidx.numInstances()*2+2)
+        
 
-            name_idx = 0
-            linenum = 0
-            for line in f :
-                line = line.strip()
-                items = line.split('\t')
-                chrom = items[0]
-                start = int(items[3])
-                end = int(items[4])
-                strand = items[6]
-                items[8] = items[8].replace("; ",";")
-                desc = items[8].split(';')
-                name = []
-                family_id = [] 
-                ele_id = []
-                class_id = []
-                tlen = end - start + 1
-                linenum += 1
+    def getTEidx(self) :
+        return self._TEidx
+        
+    def getStart(self,TE_name_idx) :
+        if TE_name_idx < len(self._start) :
+            return self._start[TE_name_idx]
+        else :
+            return -1
 
-                for i in range(len(desc)) :
-                    desc[i] = desc[i].replace("\"","")
-                    pos = desc[i].find(" ")
-                    tid = desc[i][:pos]
-                    val = desc[i][pos+1:len(desc[i])]
+    def getEnd(self,TE_name_idx) :
+        if TE_name_idx < len(self._end) :
+            return self._end[TE_name_idx]
+        else :
+            return -1
 
-                    if tid == "gene_id" :
-                        ele_id.append (val)
-                    if tid == "transcript_id" :
-                        name.append (val)
-                    if tid == "family_id" :
-                        family_id.append (val)
-                    if tid == "class_id" :
-                        class_id.append (val)
 
-                if ele_id == [] or name == [] or family_id == [] or class_id == [] :
-                    sys.stderr.write(line+"\n")
-                    sys.stderr.write("TE GTF format error! There is no annotation at line %s.\n" % (linenum))
-                    raise
+    # name of intron is e.g.
+    # AluSp_dup2_right:AluSp:Alu:SINE:+;L2b_dup12455_left:L2b:L2:LINE:+"
+    def getEleName(self,idx) :
+        full_name = None
+        if idx >= len(self._nameIDmap) or idx < 0 :
+            return None
+        else :
+            full_name =  self._nameIDmap[idx]
+        if full_name is not None:
+            vals = []
+            names = full_name.split(";")
+            for i in range(len(names)):
+                pos = names[i].find(':')
+                vals.append( names[i][pos+1:(len(names[i])-2)])
+            return vals
+        else :
+            return None
 
-                # name of intron is e.g.
-                # AluSp_dup2_right:AluSp:Alu:SINE:+;L2b_dup12455_left:L2b:L2:LINE:+"
-                full_name = ""
-                for i in range(len(name)) :
-                    if fullname != "":
-                        full_name += ";"
-                    full_name += name[i]+':'+ele_id[i]+':'+family_id[i]+':'+class_id[i]+':'+strand
-                    ele_name = ele_id[i]+':'+family_id[i]+':'+class_id[i]
-                    if ele_name not in self._elements :
-                        self._elements.append(ele_name)
+    #group by element
+    def groupByEle(self,te_inst_counts) :
 
-                self._start.append(start)
-                self._end.append(end)
-                self._length.append(tlen)
-                self._nameIDmap.append(full_name)
+        TEs = self.getElements()
+        te_ele_counts = dict(zip(TEs,[0]*len(TEs)))
 
-                if self.indexlist.has_key(chrom) :
-                        index = self.indexlist[chrom]
+        for i in range(len(te_inst_counts)) :
+            ele_names = self.getEleName(i)
+            for i in range(len(ele_names)): 
+                ele_name = ele_names[i]
 
-                        bin_startID = start/TEindex_BINSIZE
-                        bin_endID = end/TEindex_BINSIZE
-                        if start == bin_startID * TEindex_BINSIZE :
-                            bin_startID -= 1
-                        while bin_startID <= bin_endID :
-                            end_pos = min(end,(bin_startID+1) * TEindex_BINSIZE )
-                            start_pos = max(start,bin_startID * TEindex_BINSIZE+1)
+                if ele_name is None:
+                    sys.stderr.write("TE out of index boundary!\n")
+                    sys.exit(1)
 
-                            index.insert(start_pos,end_pos,name_idx)
-                            bin_startID += 1
-
+                if ele_name in te_ele_counts :
+                    te_ele_counts[ele_name] += te_inst_counts[i]
                 else :
-                        index = BinaryTree()
-                        bin_startID = start/TEindex_BINSIZE
-                        bin_endID = end/TEindex_BINSIZE
-                        if start == bin_startID * TEindex_BINSIZE :
-                            bin_startID -= 1
-                        while bin_startID <= bin_endID :
-                            end_pos = min(end,(bin_startID+1) * TEindex_BINSIZE )
-                            start_pos = max(start,bin_startID * TEindex_BINSIZE+1)
-                            index.insert(start_pos,end_pos,name_idx)
-                            bin_startID += 1
+                    sys.stderr.write("TE inconsistency! "+ele_name+"\n")
+                    sys.exit(1)
 
-                        self.indexlist[chrom] = index
+        return te_ele_counts
 
-                name_idx += 1
 
-            f.close()
+    def build(self,filename,te_mode):
+        self.__srcfile = filename
+
+        try:
+            f = open(self.__srcfile,'r')
+        except:
+            logging.error("cannot open such file %s !\n" %(self.__srcfile))
+            sys.exit(1)
+
+        name_idx = 0
+        linenum = 0
+        for line in f :
+            line = line.strip()
+            items = line.split('\t')
+            chrom = items[0]
+            start = int(items[3])
+            end = int(items[4])
+            strand = items[6]
+            items[8] = items[8].replace("; ",";")
+            desc = items[8].split(';')
+            name = []
+            family_id = [] 
+            ele_id = []
+            class_id = []
+            tlen = end - start + 1
+            linenum += 1
+            full_name = ""
+
+            for i in range(len(desc)) :
+                desc[i] = desc[i].replace("\"","")
+                print desc[i]
+                pos = desc[i].find(" ")
+                tid = desc[i][:pos]
+                val = desc[i][pos+1:len(desc[i])]
+
+                if tid == "gene_id" :
+                    ele_id.append (val)
+                if tid == "transcript_id" :
+                    name.append (val)
+                if tid == "family_id" :
+                    family_id.append (val)
+                if tid == "class_id" :
+                    class_id.append (val)
+
+            if ele_id == [] or name == [] or family_id == [] or class_id == [] :
+                sys.stderr.write(line+"\n")
+                sys.stderr.write("TE GTF format error! There is no annotation at line %s.\n" % (linenum))
+                raise
+
+            # name of intron is e.g.
+            # AluSp_dup2_right:AluSp:Alu:SINE:+;L2b_dup12455_left:L2b:L2:LINE:+"
+            for i in range(len(name)) :
+                print name[i]
+                pos = name[i].rfind("_")
+                TEinstancename = name[i][:pos]
+                TEnextto = name[i][pos+1:]
+                if full_name != "":
+                    full_name += ";"
+                full_name += name[i]+':'+ele_id[i]+':'+family_id[i]+':'+class_id[i]+':'+strand
+                ele_name = ele_id[i]+':'+family_id[i]+':'+class_id[i]
+                if ele_name not in self._elements :
+                    self._elements.append(ele_name)
+
+                # find out adjacent TE and save information
+                if (TEnextto == "left"): 
+                    TEidx_list  = self._TEidx.findOvpTE(chrom,end+1,end+1)
+                    print "intron_left2TE: ", TEidx_list
+                    if TEidx_list: 
+                        print self._TEidx.getInstanceName(TEidx_list[0][0]), "==", TEinstancename
+                        assert self._TEidx.getInstanceName(TEidx_list[0][0]) == TEinstancename
+                        self._TEidx.setLeftIntronIdx(TEidx_list[0][0], name_idx)
+                        self._left2TEIDmap.append(TEidx_list[0])
+                if (TEnextto == "right"): 
+                    TEidx_list  = self._TEidx.findOvpTE(chrom,start-1,start-1)
+                    print "intron_right2TE: ", TEidx_list
+                    if TEidx_list: 
+                        print self._TEidx.getInstanceName(TEidx_list[0][0]), "==", TEinstancename
+                        assert self._TEidx.getInstanceName(TEidx_list[0][0]) == TEinstancename
+                        self._TEidx.setRightIntronIdx(TEidx_list[0][0], name_idx)
+                        self._right2TEIDmap.append(TEidx_list[0])
+
+            assert len(self._nameIDmap) == name_idx
+            self._start.append(start)
+            self._end.append(end)
+            self._length.append(tlen)
+            self._nameIDmap.append(full_name)
+
+            # find interval tree for chr in self.indexlist
+            if self.indexlist.has_key(chrom) :
+                index = self.indexlist[chrom]
+            else :
+                index = BinaryTree()
+                self.indexlist[chrom] = index
+
+            # save interval in the interval tree
+            bin_startID = start/TEindex_BINSIZE
+            bin_endID = end/TEindex_BINSIZE
+            if start == bin_startID * TEindex_BINSIZE :
+                bin_startID -= 1
+            while bin_startID <= bin_endID :
+                end_pos = min(end,(bin_startID+1) * TEindex_BINSIZE )
+                start_pos = max(start,bin_startID * TEindex_BINSIZE+1)
+
+                index.insert(start_pos,end_pos,name_idx)
+                bin_startID += 1
+
+            name_idx += 1
+
+        f.close()
 
     
     def findOvpIntron(self,chrom,start,end):
