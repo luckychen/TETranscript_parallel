@@ -47,7 +47,7 @@ def prepare_parser():
                         help='GTF file for gene annotations')
     parser.add_argument('--TE', metavar='TE-GTF-file', dest='tefile', type=str, required=True,
                         help='GTF file for transposable element annotations')
-    parser.add_argument('--intron', metavar='intron-GTF-file', dest='intronfile', type=str, required=True,
+    parser.add_argument('--intron', metavar='intron-GTF-file', dest='intronfile', type=str, required=False,
                         help='GTF file for introns flanking transposable elements')
     parser.add_argument('--format', metavar='input file format', dest='format', type=str, nargs='?', default='BAM', choices=['BAM','SAM'],
                         help='Input file format: BAM or SAM. DEFAULT: BAM')
@@ -88,7 +88,8 @@ class UnknownChrom(Exception):
 
 # Reading files containing alignments (BAM of SAM)
 def count_reads(samples, format, geneIdx, teIdx, intronIdx, stranded, te_mode, sortByPos, prj_name,numItr,fragLength,maxL):
-    cnt_tbl = {}
+    cnt_ele_tbl = {}
+    cnt_instance_tbl = {}
     libsize = []
     # check input files exist or not
     for filename in samples :
@@ -98,14 +99,28 @@ def count_reads(samples, format, geneIdx, teIdx, intronIdx, stranded, te_mode, s
     try:
         for filename in samples :
             (gene_counts,te_instance_counts,intron_counts) = count_transcript_abundance(filename,format,geneIdx,teIdx,intronIdx, stranded,te_mode, sortByPos, prj_name,numItr,fragLength,maxL)
-            
+           
+            #create dict from te count arrays 
+            te_i_cnts_dict = teIdx.countByName(te_instance_counts)
             #summarize on elements
             te_ele_counts = teIdx.groupByEle(te_instance_counts)
-            intron_ele_counts = intronIdx.groupByEle(intron_counts)
             # save gene counts and TE counts into count table
-            cnt_tbl[filename] = dict(gene_counts.items() + te_ele_counts.items() + intron_ele_counts.items())
-            num_reads = sum(gene_counts.values())+sum(te_ele_counts.values())+sum(intron_ele_counts.values())
-            libsize.append(num_reads)
+            if intronIdx:
+                intron_cnts_dict = intronIdx.countByName(intron_counts)
+                intron_ele_counts = intronIdx.groupByEle(intron_counts)
+                cnt_ele_tbl[filename] = dict(gene_counts.items() + te_ele_counts.items() + intron_ele_counts.items())
+                cnt_instance_tbl[filename] = dict(gene_counts.items() + te_i_cnts_dict.items() + intron_cnts_dict.items())
+                total_ele_reads = sum(gene_counts.values())+sum(te_ele_counts.values())+sum(intron_ele_counts.values())
+                total_instance_reads = sum(gene_counts.values())+sum(te_i_cnts_dict.values())+sum(intron_cnts_dict.values())
+            else:
+                cnt_ele_tbl[filename] = dict(gene_counts.items() + te_ele_counts.items())
+                cnt_instance_tbl[filename] = dict(gene_counts.items() + te_i_cnts_dict.items())
+                total_ele_reads = sum(gene_counts.values())+sum(te_ele_counts.values())
+                total_instance_reads = sum(gene_counts.values())+sum(te_i_cnts_dict.values())
+                
+            print "total ele reads: ",total_ele_reads
+            print "total instance reads: ", total_instance_reads
+            libsize.append(total_ele_reads)
     except:
         sys.stderr.write("Error: %s\n" % str(sys.exc_info()[1]))
         sys.stderr.write( "[Exception type: %s, raised in %s:%d]\n" %
@@ -114,7 +129,7 @@ def count_reads(samples, format, geneIdx, teIdx, intronIdx, stranded, te_mode, s
                             traceback.extract_tb( sys.exc_info()[2] )[-1][1] ) )
         sys.exit(1)
 
-    return (cnt_tbl,libsize)
+    return (cnt_ele_tbl,cnt_instance_tbl,libsize)
 
 
 #read assignment
@@ -158,6 +173,9 @@ def ovp_annotation(references,alignments_per_read,geneIdx,teIdx,intronIdx,strand
 
     #loop over every alignment
     for r1,r2 in alignments_per_read :
+        TEs = []
+        introns = []
+        genes = []
         itv_list = []
         direction = 1
         if r1 is not None and r1.is_reverse :
@@ -191,8 +209,9 @@ def ovp_annotation(references,alignments_per_read,geneIdx,teIdx,intronIdx,strand
             print "itv_list ",itv_list
             TEs = teIdx.TE_annotation(itv_list)
             print "TEs: ",TEs
-            introns = intronIdx.intron_annotation(itv_list)
-            print "introns: ",introns
+            if intronIdx:
+                introns = intronIdx.intron_annotation(itv_list)
+                print "introns: ",introns
             genes = geneIdx.Gene_annotation(itv_list)
             print "genes: ",genes
 
@@ -281,11 +300,15 @@ def count_transcript_abundance(filename, format, geneIdx, teIdx, intronIdx, stra
     gene_counts = dict(zip(geneIdx.getFeatures(),[0.0]*len(geneIdx.getFeatures())))
     te_counts = [0.0] * teIdx.numInstances()
     te_multi_counts = [0.0]*len(te_counts)
-    intron_counts = [0.0] * intronIdx.numInstances()
-    intron_multi_counts = [0.0]*len(intron_counts)
+    intron_counts = None
+    intron_multi_counts = None
     multi_reads_te = []
     multi_reads_intron = []
     cc = 0
+    if intronIdx: 
+        intron_counts = [0.0] * intronIdx.numInstances()
+        intron_multi_counts = [0.0]*len(intron_counts)
+
     try:
         while(1):
             i += 1
@@ -432,22 +455,34 @@ def count_transcript_abundance(filename, format, geneIdx, teIdx, intronIdx, stra
                     no_annot_te = parse_annotations_TE(multi_reads_te,annot_TE, te_counts, te_multi_counts, leftOver_te)
 
                     if no_annot_te :
-                        no_annot_intron = parse_annotations_intron(multi_reads_intron, annot_intron, intron_counts, intron_multi_counts, leftOver_intron)
-                        if no_annot_intron :
+                        if intronIdx: 
+                            no_annot_intron = parse_annotations_intron(multi_reads_intron, annot_intron, intron_counts, intron_multi_counts, leftOver_intron)
+                            if no_annot_intron :
+                                no_annot_gene = parse_annotations_gene(annot_gene,gene_counts,leftOver_gene)
+                                if no_annot_gene :
+                                    #sys.stderr.write("unannotated\n")
+                                    empty += 1
+                        else:
                             no_annot_gene = parse_annotations_gene(annot_gene,gene_counts,leftOver_gene)
                             if no_annot_gene :
                                 #sys.stderr.write("unannotated\n")
                                 empty += 1
+ 
 
                 else : #uniq read , priority to gene
                     no_annot_gene = parse_annotations_gene(annot_gene,gene_counts,leftOver_gene)
                     if no_annot_gene :
                         no_annot_te = parse_annotations_TE(multi_reads_te,annot_TE, te_counts, te_multi_counts, leftOver_te)
                         if no_annot_te :
-                            no_annot_intron = parse_annotations_intron(multi_reads_intron, annot_intron, intron_counts, intron_multi_counts, leftOver_intron)
-                            if no_annot_intron :
+                            if intronIdx:
+                                no_annot_intron = parse_annotations_intron(multi_reads_intron, annot_intron, intron_counts, intron_multi_counts, leftOver_intron)
+                                if no_annot_intron :
+                                    #sys.stderr.write("unannotated\n")
+                                    empty += 1
+                            else:
                                 #sys.stderr.write("unannotated\n")
                                 empty += 1
+
 
 
             except:
@@ -478,7 +513,7 @@ def count_transcript_abundance(filename, format, geneIdx, teIdx, intronIdx, stra
             #resolve ambiguity
             if len(leftOver_gene) > 0 :
                 resolve_annotation_ambiguity(gene_counts,leftOver_gene)
-            if len(leftOver_intron) > 0 :
+            if intronIdx and len(leftOver_intron) > 0 :
                 resolve_annotation_ambiguity(intron_counts,leftOver_intron)
             if len(leftOver_te) > 0 :
                 resolve_annotation_ambiguity(te_counts,leftOver_te)
@@ -511,48 +546,49 @@ def count_transcript_abundance(filename, format, geneIdx, teIdx, intronIdx, stra
               te_counts = map(operator.add,te_counts,new_te_multi_counts)
             else :
               te_counts = map(operator.add,te_counts,te_multi_counts)
+        
+            if intronIdx:
+                ss = sum(intron_counts)
+                sys.stderr.write("uniq intron counts = %s \n" % (str(ss)))
 
+                # handling multi-mapped intron counts
+                intron_tmp_counts = [0]*len(intron_counts)
 
-            ss = sum(intron_counts)
-            sys.stderr.write("uniq intron counts = %s \n" % (str(ss)))
+                if numItr > 0 :
+                  try :
+                    ''' iterative optimization on TE reads '''
+                    sys.stderr.write(".......start iterative optimization ..........\n")
+                    if not paired and fragLength > 0:
+                        avgReadLength = fragLength
 
-            # handling multi-mapped intron counts
-            intron_tmp_counts = [0]*len(intron_counts)
+                    elif avgReadLength > 0 :
+                        avgReadLength = int(avgReadLength/tmp_cnt)
+                    else :
+                        sys.stderr.write("There are not enough reads to estimate fragment length. \n" )
+                        raise 
+                    new_intron_multi_counts = [0] *len(intron_counts)  
+                    if len(multi_reads_intron) > 0 :
+                        new_intron_multi_counts = EMestimate(intronIdx,multi_reads_intron,intron_tmp_counts,intron_multi_counts,numItr,avgReadLength)
 
-            if numItr > 0 :
-              try :
-                ''' iterative optimization on TE reads '''
-                sys.stderr.write(".......start iterative optimization ..........\n")
-                if not paired and fragLength > 0:
-                    avgReadLength = fragLength
-
-                elif avgReadLength > 0 :
-                    avgReadLength = int(avgReadLength/tmp_cnt)
+                  except :
+                    sys.stderr.write("Error in optimization\n")
+                    raise
+                  intron_counts = map(operator.add,intron_counts,new_intron_multi_counts)
                 else :
-                    sys.stderr.write("There are not enough reads to estimate fragment length. \n" )
-                    raise 
-                new_intron_multi_counts = [0] *len(intron_counts)  
-                if len(multi_reads_intron) > 0 :
-                    new_intron_multi_counts = EMestimate(intronIdx,multi_reads_intron,intron_tmp_counts,intron_multi_counts,numItr,avgReadLength)
-
-              except :
-                sys.stderr.write("Error in optimization\n")
-                raise
-              intron_counts = map(operator.add,intron_counts,new_intron_multi_counts)
-            else :
-              intron_counts = map(operator.add,intron_counts,intron_multi_counts)
+                  intron_counts = map(operator.add,intron_counts,intron_multi_counts)
 
 
     except:
             sys.stderr.write("Error occurred when assigning read gene/TE annotations in file %s.\n" % (filename))
             raise
     st = sum(te_counts)
-    si = sum(intron_counts)
+    si = 0
+    if intronIdx: si = sum(intron_counts)
     sg = sum(gene_counts.values())
     num_reads = st + si + sg
 
     sys.stderr.write("TE counts total %s\n" % (st))
-    sys.stderr.write("intron counts total %s\n" % (si))
+    if intronIdx: sys.stderr.write("intron counts total %s\n" % (si))
     sys.stderr.write("Gene counts total %s\n" % (sg))
     sys.stderr.write("\nIn library %s:\n" % (filename))
     sys.stderr.write("Total annotated reads = %s\n" % ( str(num_reads) ) )
@@ -735,9 +771,9 @@ def output_count_tbl(t_tbl, c_tbl, fname):
         f.write(header + "\n")
         for gene in sorted(cnt_tbl.keys()) :
            vals = cnt_tbl[gene]
-           vals_str = gene
+           vals_str = gene if gene else "None"
            for i in range(len(vals)) :
-              vals_str +="\t"+str(vals[i])
+               if vals[i]: vals_str +="\t"+str(vals[i])
            f.write(vals_str + "\n")
 
         f.close()
@@ -851,6 +887,7 @@ def write_R_code(f_cnt_tbl, tfiles, cfiles, prj_name, norm, pval, fc, rpm_val,mi
 def main():
     """Start TEtranscripts......parse options......"""
 
+    sys.setrecursionlimit(10000)
     args=read_opts2(prepare_parser())
 
     info = args.info
@@ -904,55 +941,59 @@ def main():
 #    sys.exit(1)
 
     #TEflanking introns index
-#try :
-    intronIdx = IntronFeatures(teIdx)
-    cur_time = time.time()
-    if (args.b_pickle): 
-        intron_picklefile = '.intron.HI.pickle.2.7'
-        if os.path.isfile(intron_picklefile) and os.path.getsize(intron_picklefile) > 0:
-            info("\nLoading intron pickle .......\n")
-            with open(intron_picklefile, 'rb') as fp:
-                gc.disable()    # disable garbage collector
-                intronIdx = pickle.load(fp)
-                gc.enable()
-            info("\nDone loading intron pickle .......\n")
-        else:
+    intronIdx = None
+    if args.intronfile:
+    #try :
+        intronIdx = IntronFeatures(teIdx)
+        cur_time = time.time()
+        if (args.b_pickle): 
+            intron_picklefile = '.intron.HI.pickle.2.7'
+            if os.path.isfile(intron_picklefile) and os.path.getsize(intron_picklefile) > 0:
+                info("\nLoading intron pickle .......\n")
+                with open(intron_picklefile, 'rb') as fp:
+                    gc.disable()    # disable garbage collector
+                    intronIdx = pickle.load(fp)
+                    gc.enable()
+                info("\nDone loading intron pickle .......\n")
+            else:
+                info("\nBuilding intron index .......\n")
+                intronIdx.build(args.intronfile,args.te_mode)
+                info("Done building intron index ......\n")
+                info("\nDumping intron pickle .......\n")
+                with open(intron_picklefile, 'wb') as fp:
+                    pickle.dump(intronIdx, fp, protocol=pickle.HIGHEST_PROTOCOL)
+                info("\nDone dumping intron pickle .......\n")
+        else: 
             info("\nBuilding intron index .......\n")
             intronIdx.build(args.intronfile,args.te_mode)
             info("Done building intron index ......\n")
-            info("\nDumping intron pickle .......\n")
-            with open(intron_picklefile, 'wb') as fp:
-                pickle.dump(intronIdx, fp, protocol=pickle.HIGHEST_PROTOCOL)
-            info("\nDone dumping intron pickle .......\n")
-    else: 
-        info("\nBuilding intron index .......\n")
-        intronIdx.build(args.intronfile,args.te_mode)
-        info("Done building intron index ......\n")
-#except :
-#    sys.stderr.write("Error in building intron flanking intron index \n")
-#    sys.exit(1)
+    #except :
+    #    sys.stderr.write("Error in building intron flanking intron index \n")
+    #    sys.exit(1)
 
 
 
     # Read sample files make count table
     info("\nReading sample files ...\n")
 
-    (tsamples_tbl, tsamples_rpm) = count_reads(args.tfiles, args.parser, geneIdx, teIdx, intronIdx, args.stranded, args.te_mode, args.sortByPos, args.prj_name,args.numItr,args.fragLength,args.maxL)
-    (csamples_tbl, csamples_rpm) = count_reads(args.cfiles, args.parser, geneIdx, teIdx, intronIdx, args.stranded, args.te_mode, args.sortByPos, args.prj_name,args.numItr,args.fragLength,args.maxL)
+    (tsamples_ele_tbl, tsamples_instance_tbl, tsamples_rpm) = count_reads(args.tfiles, args.parser, geneIdx, teIdx, intronIdx, args.stranded, args.te_mode, args.sortByPos, args.prj_name,args.numItr,args.fragLength,args.maxL)
+    (csamples_ele_tbl, csamples_instance_tbl, csamples_rpm) = count_reads(args.cfiles, args.parser, geneIdx, teIdx, intronIdx, args.stranded, args.te_mode, args.sortByPos, args.prj_name,args.numItr,args.fragLength,args.maxL)
     
     info("Finished processing sample files")
 
     info("Generating counts table")
 
-    f_cnt_tbl = args.prj_name + ".cntTable"
-    output_count_tbl(tsamples_tbl, csamples_tbl, f_cnt_tbl)
+    f_ele_tbl = args.prj_name + ".ele.cntTable"
+    f_instance_tbl = args.prj_name + ".instance.cntTable"
+    output_count_tbl(tsamples_ele_tbl, csamples_ele_tbl, f_ele_tbl)
+    output_count_tbl(tsamples_instance_tbl, csamples_instance_tbl, f_instance_tbl)
     rpm_val = tsamples_rpm + csamples_rpm
 
     sys.exit(0)
     #info("Calculating differential expression ...\n")
     # Obtaining R-code for differential analysis
 
-    rscript = write_R_code(f_cnt_tbl, args.tfiles, args.cfiles, args.prj_name, args.norm, args.pval, args.fc, rpm_val,args.min_read)
+    rscript = write_R_code(f_ele_tbl, args.tfiles, args.cfiles, args.prj_name, args.norm, args.pval, args.fc, rpm_val,args.min_read)
 
     f_rscript = args.prj_name + '_DESeq.R'
     rcode = open('%s' % (f_rscript) , 'w')

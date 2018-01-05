@@ -16,6 +16,7 @@ import sys, time
 import logging
 from math import ceil,floor
 from Constants import TEindex_BINSIZE
+from operator import methodcaller
 
 #TEindex_BINSIZE = 200
 sys.setrecursionlimit(10000)
@@ -427,26 +428,15 @@ class TEfeatures:
 
         return te_ele_counts
 
-#    #group by transcript name
-#    def groupByName(self,te_inst_counts) :
-#
-#        TEs = self.getNames()
-#        te_name_counts = dict(zip(TEs,[0]*len(TEs)))
-#
-#        for i in range(len(te_inst_counts)) :
-#            name = self.getFullName(i)
-#
-#            if name is None:
-#                sys.stderr.write("TE out of index boundary!\n")
-#                sys.exit(1)
-#
-#            if name in te_name_counts :
-#                te_name_counts[name] += te_inst_counts[i]
-#            else :
-#                sys.stderr.write("TE inconsistency! "+name+"\n")
-#                sys.exit(1)
-#
-#        return te_name_counts
+    # count by Instance name
+    def countByName(self,te_inst_counts) :
+        print "countByName"
+        TEnames = self.getNames()
+        print TEnames
+        print te_inst_counts
+        assert len(TEnames) == len(te_inst_counts)
+        te_name_counts = dict(zip(TEnames,te_inst_counts))
+        return te_name_counts
 
     def build (self,filename,te_mode):
             self.__srcfile = filename
@@ -600,18 +590,22 @@ class IntronFeatures(TEfeatures, object):
     def groupByEle(self,te_inst_counts) :
 
         TEs = self.getElements()
+        print TEs
+        print self.getNames() 
+        print te_inst_counts
         te_ele_counts = dict(zip(TEs,[0]*len(TEs)))
 
         for i in range(len(te_inst_counts)) :
             ele_names = self.getEleName(i)
-            for i in range(len(ele_names)): 
-                ele_name = ele_names[i]
-
+            for j in range(len(ele_names)): 
+                ele_name = ele_names[j]
+                print ele_name
                 if ele_name is None:
                     sys.stderr.write("TE out of index boundary!\n")
                     sys.exit(1)
 
                 if ele_name in te_ele_counts :
+                    print te_ele_counts[ele_name]
                     te_ele_counts[ele_name] += te_inst_counts[i]
                 else :
                     sys.stderr.write("TE inconsistency! "+ele_name+"\n")
@@ -683,7 +677,7 @@ class IntronFeatures(TEfeatures, object):
                 if ele_name not in self._elements :
                     self._elements.append(ele_name)
 
-                # find out adjacent TE and save information
+                # find out adjacent TE and save the idx
                 if (TEnextto == "left"): 
                     TEidx_list  = self._TEidx.findOvpTE(chrom,end+1,end+1)
                     print "intron_left2TE: ", TEidx_list
