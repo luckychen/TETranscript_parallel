@@ -332,6 +332,7 @@ def read_opts2(parser):
                 "# control files = %s" % (args.cfiles), \
                 "# GTF file = %s " % (args.gtffile), \
                 "# TE file = %s " % (args.tefile), \
+                "# intron file = %s " % (args.intronfile), \
                 "# multi-mapper mode = %s " % (args.te_mode), \
                 "# stranded = %s " % (args.stranded), \
                 "# normalization = %s (rpm: Reads Per Million mapped; quant: Quantile normalization)" % (args.norm), \
@@ -339,7 +340,8 @@ def read_opts2(parser):
                 "# fold-change cutoff = %5.2f" % (args.fc), \
                         "# read count cutoff = %d" % (args.min_read), \
                         "# number of iteration = %d" % (args.numItr), \
-                "# Alignments grouped by read ID = %s\n" % (not args.sortByPos)
+                "# Alignments grouped by read ID = %s" % (not args.sortByPos), \
+                "# pickle index files = %s\n" % (args.b_pickle)
     ))
     return args 
 

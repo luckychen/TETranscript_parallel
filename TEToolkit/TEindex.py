@@ -15,245 +15,10 @@ with the distribution).
 import sys, time
 import logging
 from math import ceil,floor
+from ItvTree import ItvTree
 from Constants import TEindex_BINSIZE
-from operator import methodcaller
 
 #TEindex_BINSIZE = 200
-sys.setrecursionlimit(10000)
-class Node :
-    def __init__(self,start=-1,end=-1,name=-1,parent=None,left=None,right=None):
-        self.__start = start
-        self.__end = end
-     #   self.binstart = binstart
-     #   self.binend = binend
-        self.__name = name #idx in nameIDmap
-        self.__namelist = {}
-        self.left = left
-        self.right = right
-        self.balanceFactor = 0
-        self.parent = parent
-        self.isroot = False
-        self.add(start,end,name)
-
-    def add(self,start,end,name) :
-        if start in self.__namelist :
-            self.__namelist[start].append((name,end))
-        else :
-            self.__namelist[start] = [(name,end)]
-
-    def isRoot(self):
-        return self.isroot
-
-    def isLeftChild(self):
-        return self.parent and self.parent.left == self
-
-    def isRightChild(self):
-        return  self.parent and self.parent.right == self
-
-    def getStart(self):
-        bin_startID = self.__start/TEindex_BINSIZE
-        if self.__start == bin_startID * TEindex_BINSIZE :
-             bin_startID -= 1
-        return bin_startID
-
-    def getEnd(self):
-        bin_endID = self.__end/TEindex_BINSIZE
-        return bin_endID
-
-    def getName(self):
-        return self.__name
-
-    def overlaps(self,start,end):
-        TEnamelist = []
-        for s in sorted(self.__namelist.keys()) :
-            if s > end :
-                break
-            eles = self.__namelist[s]
-            for name, e in eles :
-                if start <= e and end >= s :
-                    print "overlaps: ", start, " ", end, " idx=", name, " ", s, " ", e, "len: ", end-s
-                    TEnamelist.append([name,min(end,e)-max(start,s)])
-
-        return TEnamelist
-        #if start < self.__end and end >= self.__start :
-        #    return True
-        #else :
-        #    return False
-
-class BinaryTree :
-    def __init__(self):
-
-        self.root = None
-        self.size = 0
-
-
-    def children_count(self):
-        """
-        Return the number of children
-
-        @returns number of children: 0, 1, 2
-        """
-        cnt = 0
-        if self.left:
-            cnt += 1
-        if self.right:
-            cnt += 1
-        return cnt
-
-    def insert(self,start,end,name):
-        if self.root:
-            self.__insert(self.root,start,end,name)
-        else:
-            self.root = Node(start,end,name)
-            self.root.isroot  = True
-        self.size = self.size + 1
-
-    def __insert(self, node, start,end,name):
-        """
-        Insert new node with data
-
-        @param data node data object to insert
-        """
-        root = node
-        binstart = start/TEindex_BINSIZE
-        if start == binstart * TEindex_BINSIZE :
-            binstart -= 1
-
-        if binstart == root.getStart() :
-            root.add(start,end,name)
-
-        if binstart < root.getStart():
-            if root.left is None:
-                root.left = Node(start=start,end=end,name=name,parent=root)
-
-                self.updateBalance(root.left)
-            else:
-                self.__insert(root.left,start,end,name)
-        if binstart > root.getStart():
-            if root.right is None:
-                root.right = Node(start,end,name,parent=root)
-
-                self.updateBalance(root.right)
-            else:
-                self.__insert(root.right,start,end,name)
-
-
-    def updateBalance(self,node):
-        if node.balanceFactor > 1 or node.balanceFactor < -1 :
-            self.rebalance(node)
-            return
-
-        if node.parent != None :
-            if node.isLeftChild() :
-                node.parent.balanceFactor += 1
-            elif node.isRightChild() :
-                node.parent.balanceFactor -= 1
-
-            if node.parent.balanceFactor != 0 :
-                self.updateBalance(node.parent)
-
-    def rebalance(self,node):
-        if node.balanceFactor < 0 :
-            if node.right.balanceFactor > 0 :
-                self.rotateRight(node.right)
-                self.rotateLeft(node)
-            else :
-                self.rotateLeft(node)
-        elif node.balanceFactor > 0 :
-            if node.left.balanceFactor < 0 :
-                self.rotateLeft(node.left)
-                self.rotateRight(node)
-            else :
-                self.rotateRight(node)
-
-    def rotateRight(self,oldRoot):
-        newRoot = oldRoot.left
-        oldRoot.left = newRoot.right
-        if newRoot.right != None :
-            newRoot.right.parent = oldRoot
-        newRoot.parent = oldRoot.parent
-
-        if oldRoot.isRoot() :
-            self.root = newRoot
-            newRoot.isroot = True
-        else :
-            if oldRoot.isLeftChild() :
-                oldRoot.parent.left = newRoot
-            else :
-                oldRoot.parent.right = newRoot
-
-
-        newRoot.right = oldRoot
-        oldRoot.parent = newRoot
-        oldRoot.balanceFactor = oldRoot.balanceFactor - 1 - max(newRoot.balanceFactor,0)
-        newRoot.balanceFactor = newRoot.balanceFactor - 1 + min(oldRoot.balanceFactor,0)
-
-    def rotateLeft(self,oldRoot):
-        newRoot = oldRoot.right
-        oldRoot.right = newRoot.left
-        if newRoot.left != None :
-            newRoot.left.parent = oldRoot
-        newRoot.parent = oldRoot.parent
-
-        if oldRoot.isRoot() :
-            self.root = newRoot
-            newRoot.isroot = True
-        else :
-            if oldRoot.isLeftChild() :
-                oldRoot.parent.left = newRoot
-            else :
-                oldRoot.parent.right = newRoot
-
-
-        newRoot.left = oldRoot
-        oldRoot.parent = newRoot
-        oldRoot.balanceFactor = oldRoot.balanceFactor + 1 - min(newRoot.balanceFactor,0)
-        newRoot.balanceFactor = newRoot.balanceFactor + 1 - max(oldRoot.balanceFactor,0)
-    #range query
-    def lookup_r(self,start,end,node) :
-
-        if node is None :
-            return (None,None)
-
-        node_start = node.getStart()
-        if end < node_start :
-            return self.lookup_r(start,end,node.left)
-
-        if start > node_start :
-            return self.lookup_r(start,end,node.right)
-
-        if start == node_start and end == node_start:
-            return (node,None)
-
-        if start == node_start and end > node_start :
-            return (node,self.lookup_p(end,node.right))
-
-        if end == node_start and start < node_start :
-            return (self.lookup_p(start,node.left),node)
-        return (None,None)
-    #point query using start point
-    def lookup_p(self, start,node):
-        """
-        Lookup node containing data
-
-        @param data node data object to look up
-        @param parent node's parent
-        @returns node and node's parent if found or None, None
-        """
-        if node is None :
-            return None
-        if start < node.getStart():
-            if node.left is None:
-                return None
-            return self.lookup_p(start, node.left)
-
-        elif start > node.getStart():
-            if node.right is None:
-                    return None
-            return self.lookup_p(start, node.right)
-        else:
-            return node
-
 
 class TEfeatures:
     """index of TE annotations.
@@ -340,7 +105,7 @@ class TEfeatures:
 
         if self.indexlist.has_key(chr) :
             index = self.indexlist[chr]
-            (node,RBnode) = index.lookup(binID,index.root,None,None)
+            (node,RBnode) = index.lookup(binID,index._root,None,None)
 
             if node is not None and node.overlaps(binID,endbinID) :
                 full_name = (node.getName()).split(':')
@@ -368,7 +133,7 @@ class TEfeatures:
         else :
             return None
 
-        (LBnode,RBnode) = index.lookup_r(startbinID,endbinID,index.root)
+        (LBnode,RBnode) = index.lookup_r(startbinID,endbinID,index._root)
 
         if LBnode is not None :
             telist = LBnode.overlaps(start,end)
@@ -388,7 +153,7 @@ class TEfeatures:
             end = iv[2]
             strand = iv[3]
             name_idx_list  = self.findOvpTE(chromo,start,end)
-            print "name_idx_list: ", name_idx_list
+            #print "name_idx_list: ", name_idx_list
 
             if name_idx_list is not None :
                 for (t,ovp_len) in name_idx_list :
@@ -511,7 +276,7 @@ class TEfeatures:
                             bin_startID += 1
 
                 else :
-                        index = BinaryTree()
+                        index = ItvTree()
                         bin_startID = start/TEindex_BINSIZE
                         bin_endID = end/TEindex_BINSIZE
                         if start == bin_startID * TEindex_BINSIZE :
@@ -705,7 +470,7 @@ class IntronFeatures(TEfeatures, object):
             if self.indexlist.has_key(chrom) :
                 index = self.indexlist[chrom]
             else :
-                index = BinaryTree()
+                index = ItvTree()
                 self.indexlist[chrom] = index
 
             # save interval in the interval tree
@@ -737,7 +502,7 @@ class IntronFeatures(TEfeatures, object):
         else :
             return None
 
-        (LBnode,RBnode) = index.lookup_r(startbinID,endbinID,index.root)
+        (LBnode,RBnode) = index.lookup_r(startbinID,endbinID,index._root)
 
         if LBnode is not None :
             intronlist = LBnode.overlaps(start,end)
@@ -767,7 +532,7 @@ class IntronFeatures(TEfeatures, object):
             end = iv[2]
             strand = iv[3]
             name_idx_list  = self.findOvpIntron(chromo,start,end)
-            print "name_idx_list: ", name_idx_list
+            #print "name_idx_list: ", name_idx_list
 
             if name_idx_list is not None :
                 for (t,ovp_len) in name_idx_list :

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/local/bin/python2.7
 
 '''
 Created on Jan 27, 2014
@@ -206,7 +206,7 @@ def ovp_annotation(references,alignments_per_read,geneIdx,teIdx,intronIdx,strand
             itv_list2 = fetch_exon(chrom2,r2.pos,r2.cigar,direction,format)
             itv_list.extend(itv_list2)
         try:
-            print "itv_list ",itv_list
+            #print "itv_list ",itv_list
             TEs = teIdx.TE_annotation(itv_list)
             print "TEs: ",TEs
             if intronIdx:
@@ -386,11 +386,11 @@ def count_transcript_abundance(filename, format, geneIdx, teIdx, intronIdx, stra
 
                         else:
                             #sys.stderr.write("save alignments per read\n")
-                            print "multi_read1: ", len(multi_read1)
-                            print "multi_read2: ", len(multi_read2)
+                            #print "multi_read1: ", len(multi_read1)
+                            #print "multi_read2: ", len(multi_read2)
                           
                             larger_cnt =  max(len(multi_read1), len(multi_read2))
-                            print larger_cnt
+                            #print larger_cnt
                             for c in range(larger_cnt): 
                                 #singlton
                                 if len(multi_read2) == 0 :
@@ -417,9 +417,9 @@ def count_transcript_abundance(filename, format, geneIdx, teIdx, intronIdx, stra
                                     print "r1 r2 appended"
 
                             print "SAVED ALL COLLECTED READS"
-                            for r1,r2 in alignments_per_read :
-                                print "r1: ", r1
-                                print "r2: ", r2
+                            #for r1,r2 in alignments_per_read :
+                                #print "r1: ", r1
+                                #print "r2: ", r2
 
 
             else : #single end read
@@ -448,10 +448,10 @@ def count_transcript_abundance(filename, format, geneIdx, teIdx, intronIdx, stra
                 (annot_gene,annot_TE,annot_intron) = ovp_annotation(references,alignments_per_read, geneIdx, teIdx, intronIdx, stranded,format)
 
                 if len(alignments_per_read) > 1 : #multi read, priority to TE
-                    print "multiple alignments per read" 
-                    for r1,r2 in alignments_per_read :
-                        print "r1: ", r1
-                        print "r2: ", r2
+                    #print "multiple alignments per read" 
+                    #for r1,r2 in alignments_per_read :
+                        #print "r1: ", r1
+                        #print "r2: ", r2
                     no_annot_te = parse_annotations_TE(multi_reads_te,annot_TE, te_counts, te_multi_counts, leftOver_te)
 
                     if no_annot_te :
@@ -887,7 +887,6 @@ def write_R_code(f_cnt_tbl, tfiles, cfiles, prj_name, norm, pval, fc, rpm_val,mi
 def main():
     """Start TEtranscripts......parse options......"""
 
-    sys.setrecursionlimit(10000)
     args=read_opts2(prepare_parser())
 
     info = args.info
