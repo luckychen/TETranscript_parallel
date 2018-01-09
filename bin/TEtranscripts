@@ -208,12 +208,12 @@ def ovp_annotation(references,alignments_per_read,geneIdx,teIdx,intronIdx,strand
         try:
             #print "itv_list ",itv_list
             TEs = teIdx.TE_annotation(itv_list)
-            print "TEs: ",TEs
+            #print "TEs: ",TEs
             if intronIdx:
                 introns = intronIdx.intron_annotation(itv_list)
-                print "introns: ",introns
+                #print "introns: ",introns
             genes = geneIdx.Gene_annotation(itv_list)
-            print "genes: ",genes
+            #print "genes: ",genes
 
             if len(TEs) > 0   :
                 annot_TE.append(TEs)  # annot_TE: 2-dim array; 1-dim=alignment 2-dim=overlapping_te_idx for each interval
@@ -398,13 +398,13 @@ def count_transcript_abundance(filename, format, geneIdx, teIdx, intronIdx, stra
                                     #    alignments_per_read.append((r,None))
                                     r1 = multi_read1.pop(0)
                                     alignments_per_read.append((r1,None))
-                                    print "r1 appended"
+                                    #print "r1 appended"
                                 elif len(multi_read1) == 0:
                                     #for r in multi_read2 :
                                     #    alignments_per_read.append((None,r))
                                     r2 = multi_read2.pop(0)
                                     alignments_per_read.append((None, r2))
-                                    print "r2 appended"
+                                    #print "r2 appended"
                                 #if len(multi_read2) == len(multi_read1) :
                                 #    for i in range(len(multi_read1)) :
                                 #      read1 = multi_read1[i]
@@ -414,9 +414,9 @@ def count_transcript_abundance(filename, format, geneIdx, teIdx, intronIdx, stra
                                     r1 = multi_read1.pop(0)
                                     r2 = multi_read2.pop(0)
                                     alignments_per_read.append((r1,r2))
-                                    print "r1 r2 appended"
+                                    #print "r1 r2 appended"
 
-                            print "SAVED ALL COLLECTED READS"
+                            #print "SAVED ALL COLLECTED READS"
                             #for r1,r2 in alignments_per_read :
                                 #print "r1: ", r1
                                 #print "r2: ", r2
@@ -600,17 +600,17 @@ def count_transcript_abundance(filename, format, geneIdx, teIdx, intronIdx, stra
 
 
 def parse_annotations_gene(annot_gene, gene_counts,leftOver_gene):
-    print "parsing gene annotations "
+    #print "parsing gene annotations "
     no_annot = True
 
-    print "len(annot_gene) ", len(annot_gene)
+    #print "len(annot_gene) ", len(annot_gene)
     if len(annot_gene) > 1 :
         leftOver_gene.append((annot_gene,1.0))
             # if te_mode == "uniq" :
             #return no_annot
     elif len(annot_gene) == 1 :
         genes = annot_gene[0]
-        print "genes: ",genes
+        #print "genes: ",genes
         if len(genes) == 1 :
             gene_counts[genes[0][0]] += 1
         else :
@@ -634,9 +634,9 @@ def resolve_annotation_ambiguity(counts, leftOvers ) : # w is weight?
         if size > 1:
             ww = ww/size
 
-        print annlist
+        #print annlist
         for ann in annlist :
-            print ann
+            #print ann
             for (a,ovp_len) in ann:
                 if a not in readslist :
                     readslist[a] = counts[a]
@@ -652,28 +652,28 @@ def resolve_annotation_ambiguity(counts, leftOvers ) : # w is weight?
 
 
 def parse_annotations_TE(multi_reads, annot_TE, uniq_counts, multi_counts, leftOver_list):
-    print "parsing TE annotations "
+    #print "parsing TE annotations "
     if len(annot_TE) == 0 :
         return True
     
-    print "len(annot_TE) ", len(annot_TE)
-    print "len(annot_TE[0]) ", len(annot_TE[0])
+    #print "len(annot_TE) ", len(annot_TE)
+    #print "len(annot_TE[0]) ", len(annot_TE[0])
 
 
     if len(annot_TE) == 1 and len(annot_TE[0]) == 1 :
-        print annot_TE[0][0]
+        #print annot_TE[0][0]
         uniq_counts[annot_TE[0][0][0]] += 1
 
     if len(annot_TE) == 1 and len(annot_TE[0]) > 1 :
-        for i in range(len(annot_TE[0])):
-            print annot_TE[0][i]
+        #for i in range(len(annot_TE[0])):
+            #print annot_TE[0][i]
         leftOver_list.append((annot_TE,1.0))
 
     if len(annot_TE) > 1:
             multi_algn = []
             for i in range(len(annot_TE)):
                 for (te_idx, ovp_len) in annot_TE[i] :
-                    print te_idx, " ", ovp_len
+                    #print te_idx, " ", ovp_len
                     multi_counts[te_idx] += 1.0 / (len(annot_TE) * len(annot_TE[i]))
                     multi_algn.append(te_idx)
 
@@ -686,27 +686,27 @@ def parse_annotations_TE(multi_reads, annot_TE, uniq_counts, multi_counts, leftO
 # save intron counts for uniq_counts, multi_count and leftOvers
 # later discount the TE counts by the read depth ratios of intron counts vs TE counts.
 def parse_annotations_intron(multi_reads,annot_intron, uniq_counts,multi_counts, leftOver_list):
-    print "parsing intron annotations "
+    #print "parsing intron annotations "
     if len(annot_intron) == 0 :
         return True
 
-    print "len(annot_intron) ", len(annot_intron)
-    print "len(annot_intron[0]) ", len(annot_intron[0])
+    #print "len(annot_intron) ", len(annot_intron)
+    #print "len(annot_intron[0]) ", len(annot_intron[0])
 
     if len(annot_intron) == 1 and len(annot_intron[0]) == 1 :
-        print annot_intron[0][0]
+        #print annot_intron[0][0]
         uniq_counts[annot_intron[0][0][0]] += 1
 
     if len(annot_intron) == 1 and len(annot_intron[0]) > 1 :
-        for i in range(len(annot_intron[0])):
-            print annot_intron[0][i]
+        #for i in range(len(annot_intron[0])):
+            #print annot_intron[0][i]
         leftOver_list.append((annot_intron,1.0))
 
     if len(annot_intron) > 1:
             multi_algn = []
             for i in range(len(annot_intron)):
                 for (intron_idx, ovp_len) in annot_intron[i] :
-                    print intron_idx, " ", ovp_len
+                    #print intron_idx, " ", ovp_len
                     multi_counts[intron_idx] += 1.0 / (len(annot_intron) * len(annot_intron[i]))
                     multi_algn.append(intron_idx)
 
@@ -732,49 +732,62 @@ def output_count_tbl(t_tbl, c_tbl, fname):
     else:
         cnt_tbl = {}
         header = "gene/TE"
-        keys = set([])
-        for tsmp in t_tbl.keys():
+        keys = set([])                              # keys: set of all elements or instances 
+        for tsmp in t_tbl.keys():                   # tsmp: treatment sample filenames
             keys = keys.union(t_tbl[tsmp].keys())
+            print keys
             header +="\t"+tsmp+".T"
-        for csmp in c_tbl.keys():
+        for csmp in c_tbl.keys():                   # csmp: treatment sample filenames
             keys = keys.union(c_tbl[csmp].keys())
+            print keys
             header +="\t"+csmp+".C"
 
         for tsmp in t_tbl.keys():
             cnts = t_tbl[tsmp]
             for k in keys:
+                print k
                 val = 0
                 if k in cnts :
-                   val = cnts[k]
-
+                    val = cnts[k]
+                    print val
+                    if val is None or val is "":
+                        sys.exit(1)
                 if cnt_tbl.has_key(k) :
-                    cnt_tbl[k].append(int(val))
+                    cnt_tbl[k].append(int(round(val)))
                 else :
                     vallist = []
-                    vallist.append(int(val))
+                    vallist.append(int(round(val)))
                     cnt_tbl[k] = vallist
+                print cnt_tbl[k]
 
         for csmp in c_tbl.keys():
             cnts = c_tbl[csmp]
             for k in keys:
+                print k
                 val = 0
                 if k in cnts :
-                   val = cnts[k]
-
+                    val = cnts[k]
+                    print val
+                    if val is None or val is "":
+                        sys.exit(1)
                 if cnt_tbl.has_key(k) :
-                    cnt_tbl[k].append(int(val))
+                    cnt_tbl[k].append(int(round(val)))
                 else :
+                    print "we should never come here, right?"
+                    sys.exit(1)
                     vallist = []
-                    vallist.append(int(val))
-                    cnt_tbl[gene] = vallist
+                    vallist.append(int(round(val)))
+                    cnt_tbl[k] = vallist
+                print cnt_tbl[k]
         #output
         f.write(header + "\n")
         for gene in sorted(cnt_tbl.keys()) :
-           vals = cnt_tbl[gene]
-           vals_str = gene if gene else "None"
-           for i in range(len(vals)) :
-               if vals[i]: vals_str +="\t"+str(vals[i])
-           f.write(vals_str + "\n")
+            vals = cnt_tbl[gene]
+            print vals
+            vals_str = gene if gene else "None"
+            for i in range(len(vals)) :
+                vals_str +="\t"+str(vals[i])
+            f.write(vals_str + "\n")
 
         f.close()
 

@@ -96,7 +96,7 @@ class ItvNode(Node, object):
             eles = self.__namelist[s]
             for name, e in eles :
                 if start <= e and end >= s :
-                    print "overlaps: ", start, " ", end, " idx=", name, " ", s, " ", e, "len: ", end-s
+                    #print "overlaps: ", start, " ", end, " idx=", name, " ", s, " ", e, "len: ", end-s
                     TEnamelist.append([name,min(end,e)-max(start,s)])
 
         return TEnamelist

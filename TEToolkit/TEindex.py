@@ -160,12 +160,12 @@ class TEfeatures:
                     if strand != "." : #stranded
                         if strand == self.getStrand(t)  :
                             if t not in TEs :
-                                print self.getFullName(t), " appended"
+                                #print self.getFullName(t), " appended"
                                 TEs.append([t,ovp_len])
-                            else:
-                                print self.getFullName(t), " already in the list" 
-                        else: 
-                            print "strand ", strand, " != ", self.getStrand(t)
+                            #else:
+                                #print self.getFullName(t), " already in the list" 
+                        #else: 
+                            #print "strand ", strand, " != ", self.getStrand(t)
                     else :#not stranded
                         if t not in TEs :
                             TEs.append([t,ovp_len])
@@ -195,10 +195,10 @@ class TEfeatures:
 
     # count by Instance name
     def countByName(self,te_inst_counts) :
-        print "countByName"
+        #print "countByName"
         TEnames = self.getNames()
-        print TEnames
-        print te_inst_counts
+        #print TEnames
+        #print te_inst_counts
         assert len(TEnames) == len(te_inst_counts)
         te_name_counts = dict(zip(TEnames,te_inst_counts))
         return te_name_counts
@@ -355,22 +355,22 @@ class IntronFeatures(TEfeatures, object):
     def groupByEle(self,te_inst_counts) :
 
         TEs = self.getElements()
-        print TEs
-        print self.getNames() 
-        print te_inst_counts
+        #print TEs
+        #print self.getNames() 
+        #print te_inst_counts
         te_ele_counts = dict(zip(TEs,[0]*len(TEs)))
 
         for i in range(len(te_inst_counts)) :
             ele_names = self.getEleName(i)
             for j in range(len(ele_names)): 
                 ele_name = ele_names[j]
-                print ele_name
+                #print ele_name
                 if ele_name is None:
                     sys.stderr.write("TE out of index boundary!\n")
                     sys.exit(1)
 
                 if ele_name in te_ele_counts :
-                    print te_ele_counts[ele_name]
+                    #print te_ele_counts[ele_name]
                     te_ele_counts[ele_name] += te_inst_counts[i]
                 else :
                     sys.stderr.write("TE inconsistency! "+ele_name+"\n")
@@ -409,7 +409,7 @@ class IntronFeatures(TEfeatures, object):
 
             for i in range(len(desc)) :
                 desc[i] = desc[i].replace("\"","")
-                print desc[i]
+                #print desc[i]
                 pos = desc[i].find(" ")
                 tid = desc[i][:pos]
                 val = desc[i][pos+1:len(desc[i])]
@@ -431,7 +431,7 @@ class IntronFeatures(TEfeatures, object):
             # name of intron is e.g.
             # AluSp_dup2_right:AluSp:Alu:SINE:+;L2b_dup12455_left:L2b:L2:LINE:+"
             for i in range(len(name)) :
-                print name[i]
+                #print name[i]
                 pos = name[i].rfind("_")
                 TEinstancename = name[i][:pos]
                 TEnextto = name[i][pos+1:]
@@ -445,20 +445,20 @@ class IntronFeatures(TEfeatures, object):
                 # find out adjacent TE and save the idx
                 if (TEnextto == "left"): 
                     TEidx_list  = self._TEidx.findOvpTE(chrom,end+1,end+1)
-                    print "intron_left2TE: ", TEidx_list
+                    #print "intron_left2TE: ", TEidx_list
                     if TEidx_list: 
-                        print self._TEidx.getInstanceName(TEidx_list[0][0]), "==", TEinstancename
-                        assert self._TEidx.getInstanceName(TEidx_list[0][0]) == TEinstancename
-                        self._TEidx.setLeftIntronIdx(TEidx_list[0][0], name_idx)
-                        self._left2TEIDmap.append(TEidx_list[0])
+                        #print self._TEidx.getInstanceName(TEidx_list[0][0]), "==", TEinstancename
+                        if (self._TEidx.getInstanceName(TEidx_list[0][0]) == TEinstancename):
+                            self._TEidx.setLeftIntronIdx(TEidx_list[0][0], name_idx)
+                            self._left2TEIDmap.append(TEidx_list[0])
                 if (TEnextto == "right"): 
                     TEidx_list  = self._TEidx.findOvpTE(chrom,start-1,start-1)
-                    print "intron_right2TE: ", TEidx_list
+                    #print "intron_right2TE: ", TEidx_list
                     if TEidx_list: 
-                        print self._TEidx.getInstanceName(TEidx_list[0][0]), "==", TEinstancename
-                        assert self._TEidx.getInstanceName(TEidx_list[0][0]) == TEinstancename
-                        self._TEidx.setRightIntronIdx(TEidx_list[0][0], name_idx)
-                        self._right2TEIDmap.append(TEidx_list[0])
+                        #print self._TEidx.getInstanceName(TEidx_list[0][0]), "==", TEinstancename
+                        if (self._TEidx.getInstanceName(TEidx_list[0][0]) == TEinstancename):
+                            self._TEidx.setRightIntronIdx(TEidx_list[0][0], name_idx)
+                            self._right2TEIDmap.append(TEidx_list[0])
 
             assert len(self._nameIDmap) == name_idx
             self._start.append(start)
@@ -521,7 +521,7 @@ class IntronFeatures(TEfeatures, object):
         pos = val.rfind('_')        
         te_name = val[:pos]
         direction = val[pos+1:]
-        print te_name, " ", direction
+        #print te_name, " ", direction
 
 
     def intron_annotation(self,iv_seq):
@@ -539,13 +539,13 @@ class IntronFeatures(TEfeatures, object):
                     if strand != "." : #stranded
                         if strand == self.getStrand(t)  :
                             if t not in introns :
-                                print self.getFullName(t), " appended"
+                                #print self.getFullName(t), " appended"
                                 self.get_flankingTE(t)
                                 introns.append([t,ovp_len])
-                            else:
-                                print self.getFullName(t), " already in introns"
-                        else:
-                            print "strand ", strand, " != ", self.getStrand(t)
+                            #else:
+                                #print self.getFullName(t), " already in introns"
+                        #else:
+                            #print "strand ", strand, " != ", self.getStrand(t)
                     else :#not stranded
                         if t not in introns :
                             introns.append([t,ovp_len])

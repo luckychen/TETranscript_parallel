@@ -100,7 +100,7 @@ class IntervalTree(object):
             #                                        and i.start <= stop]
             for i in self.intervals: 
                 if i.stop >= start and i.start <= stop:
-                    print "find_gene: ", start, " ", stop, " ", i.gene, " ", i.start, " ", i.stop
+                    #print "find_gene: ", start, " ", stop, " ", i.gene, " ", i.start, " ", i.stop
                     overlapping.append([i.gene, min(stop,i.stop)-max(start,i.start)])
         else:
             overlapping = []
