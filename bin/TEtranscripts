@@ -118,8 +118,8 @@ def count_reads(samples, format, geneIdx, teIdx, intronIdx, stranded, te_mode, s
                 total_ele_reads = sum(gene_counts.values())+sum(te_ele_counts.values())
                 total_instance_reads = sum(gene_counts.values())+sum(te_i_cnts_dict.values())
                 
-            print "total ele reads: ",total_ele_reads
-            print "total instance reads: ", total_instance_reads
+            #print "total ele reads: ",total_ele_reads
+            #print "total instance reads: ", total_instance_reads
             libsize.append(total_ele_reads)
     except:
         sys.stderr.write("Error: %s\n" % str(sys.exc_info()[1]))
@@ -453,16 +453,15 @@ def count_transcript_abundance(filename, format, geneIdx, teIdx, intronIdx, stra
                         #print "r1: ", r1
                         #print "r2: ", r2
                     no_annot_te = parse_annotations_TE(multi_reads_te,annot_TE, te_counts, te_multi_counts, leftOver_te)
-
-                    if no_annot_te :
-                        if intronIdx: 
-                            no_annot_intron = parse_annotations_intron(multi_reads_intron, annot_intron, intron_counts, intron_multi_counts, leftOver_intron)
-                            if no_annot_intron :
-                                no_annot_gene = parse_annotations_gene(annot_gene,gene_counts,leftOver_gene)
-                                if no_annot_gene :
-                                    #sys.stderr.write("unannotated\n")
-                                    empty += 1
-                        else:
+                    if intronIdx: 
+                        no_annot_intron = parse_annotations_intron(multi_reads_intron, annot_intron, intron_counts, intron_multi_counts, leftOver_intron)
+                        if no_annot_te and no_annot_intron:
+                            no_annot_gene = parse_annotations_gene(annot_gene,gene_counts,leftOver_gene)
+                            if no_annot_gene :
+                                #sys.stderr.write("unannotated\n")
+                                empty += 1
+                    else:
+                        if no_annot_te:
                             no_annot_gene = parse_annotations_gene(annot_gene,gene_counts,leftOver_gene)
                             if no_annot_gene :
                                 #sys.stderr.write("unannotated\n")
@@ -473,15 +472,14 @@ def count_transcript_abundance(filename, format, geneIdx, teIdx, intronIdx, stra
                     no_annot_gene = parse_annotations_gene(annot_gene,gene_counts,leftOver_gene)
                     if no_annot_gene :
                         no_annot_te = parse_annotations_TE(multi_reads_te,annot_TE, te_counts, te_multi_counts, leftOver_te)
-                        if no_annot_te :
-                            if intronIdx:
-                                no_annot_intron = parse_annotations_intron(multi_reads_intron, annot_intron, intron_counts, intron_multi_counts, leftOver_intron)
-                                if no_annot_intron :
+                        if intronIdx:
+                            no_annot_intron = parse_annotations_intron(multi_reads_intron, annot_intron, intron_counts, intron_multi_counts, leftOver_intron)
+                            if no_annot_te and no_annot_intron:
                                     #sys.stderr.write("unannotated\n")
                                     empty += 1
-                            else:
-                                #sys.stderr.write("unannotated\n")
-                                empty += 1
+                        else:
+                            #sys.stderr.write("unannotated\n")
+                            empty += 1
 
 
 
@@ -735,21 +733,17 @@ def output_count_tbl(t_tbl, c_tbl, fname):
         keys = set([])                              # keys: set of all elements or instances 
         for tsmp in t_tbl.keys():                   # tsmp: treatment sample filenames
             keys = keys.union(t_tbl[tsmp].keys())
-            print keys
             header +="\t"+tsmp+".T"
         for csmp in c_tbl.keys():                   # csmp: treatment sample filenames
             keys = keys.union(c_tbl[csmp].keys())
-            print keys
             header +="\t"+csmp+".C"
 
         for tsmp in t_tbl.keys():
             cnts = t_tbl[tsmp]
             for k in keys:
-                print k
                 val = 0
                 if k in cnts :
                     val = cnts[k]
-                    print val
                     if val is None or val is "":
                         sys.exit(1)
                 if cnt_tbl.has_key(k) :
@@ -758,16 +752,13 @@ def output_count_tbl(t_tbl, c_tbl, fname):
                     vallist = []
                     vallist.append(int(round(val)))
                     cnt_tbl[k] = vallist
-                print cnt_tbl[k]
 
         for csmp in c_tbl.keys():
             cnts = c_tbl[csmp]
             for k in keys:
-                print k
                 val = 0
                 if k in cnts :
                     val = cnts[k]
-                    print val
                     if val is None or val is "":
                         sys.exit(1)
                 if cnt_tbl.has_key(k) :
@@ -778,12 +769,10 @@ def output_count_tbl(t_tbl, c_tbl, fname):
                     vallist = []
                     vallist.append(int(round(val)))
                     cnt_tbl[k] = vallist
-                print cnt_tbl[k]
         #output
         f.write(header + "\n")
         for gene in sorted(cnt_tbl.keys()) :
             vals = cnt_tbl[gene]
-            print vals
             vals_str = gene if gene else "None"
             for i in range(len(vals)) :
                 vals_str +="\t"+str(vals[i])
