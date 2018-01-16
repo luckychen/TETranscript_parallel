@@ -76,6 +76,8 @@ def prepare_parser():
                         help='average fragment length for single end reads. For paired-end, estimated from the input alignment file. DEFAULT: for paired-end, estimate from the input alignment file; for single-end, ignored by default.')
     parser.add_argument('--pickle', dest = 'b_pickle', action="store_true",
                         help='te Idx is pickled to be loaded in the next run')
+    parser.add_argument('--origcnt', dest = 'b_origcnt', action="store_true",
+                        help='count reads using original method from hammell lab')
     parser.add_argument('--verbose', metavar='verbose', dest='verbose', type=int, nargs='?', default=2,
                         help='Set verbose level. 0: only show critical message, 1: show additional warning message, 2: show process information, 3: show debug messages. DEFAULT:2')
     parser.add_argument('--version', action='version', version='%(prog)s 1.5.0')
@@ -87,7 +89,7 @@ class UnknownChrom(Exception):
     pass
 
 # Reading files containing alignments (BAM of SAM)
-def count_reads(samples, format, geneIdx, teIdx, intronIdx, stranded, te_mode, sortByPos, prj_name,numItr,fragLength,maxL):
+def count_reads(samples, format, geneIdx, teIdx, intronIdx, stranded, te_mode, sortByPos, prj_name,numItr,fragLength,maxL, b_origcnt):
     cnt_ele_tbl = {}
     cnt_instance_tbl = {}
     libsize = []
@@ -98,7 +100,7 @@ def count_reads(samples, format, geneIdx, teIdx, intronIdx, stranded, te_mode, s
             sys.exit(1)
     try:
         for filename in samples :
-            (gene_counts,te_instance_counts,intron_counts) = count_transcript_abundance(filename,format,geneIdx,teIdx,intronIdx, stranded,te_mode, sortByPos, prj_name,numItr,fragLength,maxL)
+            (gene_counts,te_instance_counts,intron_counts) = count_transcript_abundance(filename,format,geneIdx,teIdx,intronIdx, stranded,te_mode, sortByPos, prj_name,numItr,fragLength,maxL, b_origcnt)
            
             #create dict from te count arrays 
             te_i_cnts_dict = teIdx.countByName(te_instance_counts)
@@ -275,7 +277,7 @@ def readInAlignment(filename, format, sortByPos,prj_name):
     return samfile
 
 
-def count_transcript_abundance(filename, format, geneIdx, teIdx, intronIdx, stranded, te_mode, sortByPos, prj_name,numItr,fragLength,maxL):
+def count_transcript_abundance(filename, format, geneIdx, teIdx, intronIdx, stranded, te_mode, sortByPos, prj_name,numItr,fragLength,maxL,b_origcnt):
     #read in BAM/SAM file
     samfile = readInAlignment(filename, format, sortByPos,prj_name)
 
@@ -317,14 +319,18 @@ def count_transcript_abundance(filename, format, geneIdx, teIdx, intronIdx, stra
 
             if aligned_read.is_unmapped or aligned_read.is_duplicate or aligned_read.is_qcfail :
                 continue
-           
-            added_flag_pos = aligned_read.query_name.find('/')
-            cur_read_name = ""
-            if added_flag_pos == -1 :
-                cur_read_name = aligned_read.query_name
-            else:
-                cur_read_name = aligned_read.query_name[:added_flag_pos]
+
+            cur_read_name = aligned_read.query_name
+
             if aligned_read.is_paired :  # this is not reliable if read mate is unmapped
+                added_flag_pos = aligned_read.query_name.find('/')
+                if added_flag_pos == -1 :
+                    added_flag_pos = len(aligned_read.query_name)
+                if aligned_read.query_name.endswith(".1") or aligned_read.query_name.endswith(".2") :
+                    added_flag_pos = len(aligned_read.query_name) - 2 
+    
+                cur_read_name = aligned_read.query_name[:added_flag_pos]
+ 
                 paired = True
                 #sys.stderr.write("cur_read_name %s == " % (cur_read_name))
                 #sys.stderr.write("prev_read_name %s \n" % (prev_read_name))
@@ -334,12 +340,18 @@ def count_transcript_abundance(filename, format, geneIdx, teIdx, intronIdx, stra
                     #    print "WRONG is_read1", aligned_read
                     #if aligned_read.is_read2 & (aligned_read.query_name[added_flag_pos+1]=="1"):
                     #    print "WRONG is_read2", aligned_read
-                    #if aligned_read.is_read1 :
-                    if (aligned_read.query_name[added_flag_pos+1]=="1"):
-                            multi_read1.append(aligned_read)
-                    #if aligned_read.is_read2 :
-                    if (aligned_read.query_name[added_flag_pos+1]=="2"):
-                            multi_read2.append(aligned_read)
+                    if (b_origcnt): 
+                        if aligned_read.is_read1 :
+                                multi_read1.append(aligned_read)
+                        if aligned_read.is_read2 :
+                                multi_read2.append(aligned_read)
+                    else:
+######## new counting ###############################
+                        if (aligned_read.query_name[added_flag_pos+1]=="1"):
+                                multi_read1.append(aligned_read)
+                        if (aligned_read.query_name[added_flag_pos+1]=="2"):
+                                multi_read2.append(aligned_read)
+################################################
                     continue
 
                 else : # sort out all reads collected with same name so far
@@ -376,51 +388,63 @@ def count_transcript_abundance(filename, format, geneIdx, teIdx, intronIdx, stra
                             multi_read1 = []
                             multi_read2 = []
                             prev_read_name = cur_read_name
-                            #if aligned_read.is_read1 :
-                            if (aligned_read.query_name[added_flag_pos+1]=="1"):
-                                multi_read1.append(aligned_read)
-                            #if aligned_read.is_read2 :
-                            if (aligned_read.query_name[added_flag_pos+1]=="2"):
-                                multi_read2.append(aligned_read)
+                            if (b_origcnt): 
+                                if aligned_read.is_read1 :
+                                    multi_read1.append(aligned_read)
+                                if aligned_read.is_read2 :
+                                    multi_read2.append(aligned_read)
+                            else:
+######## new counting ###############################
+                                if (aligned_read.query_name[added_flag_pos+1]=="1"):
+                                    multi_read1.append(aligned_read)
+                                if (aligned_read.query_name[added_flag_pos+1]=="2"):
+                                    multi_read2.append(aligned_read)
+#####################################################
                             continue
 
                         else:
-                            #sys.stderr.write("save alignments per read\n")
-                            #print "multi_read1: ", len(multi_read1)
-                            #print "multi_read2: ", len(multi_read2)
-                          
-                            larger_cnt =  max(len(multi_read1), len(multi_read2))
-                            #print larger_cnt
-                            for c in range(larger_cnt): 
+                            if (b_origcnt): 
                                 #singlton
-                                if len(multi_read2) == 0 :
-                                    #for r in multi_read1 :
-                                    #    alignments_per_read.append((r,None))
-                                    r1 = multi_read1.pop(0)
-                                    alignments_per_read.append((r1,None))
-                                    #print "r1 appended"
-                                elif len(multi_read1) == 0:
-                                    #for r in multi_read2 :
-                                    #    alignments_per_read.append((None,r))
-                                    r2 = multi_read2.pop(0)
-                                    alignments_per_read.append((None, r2))
-                                    #print "r2 appended"
-                                #if len(multi_read2) == len(multi_read1) :
-                                #    for i in range(len(multi_read1)) :
-                                #      read1 = multi_read1[i]
-                                #      read2 = multi_read2[i]
-                                #      alignments_per_read.append((read1,read2))
-                                else: 
-                                    r1 = multi_read1.pop(0)
-                                    r2 = multi_read2.pop(0)
-                                    alignments_per_read.append((r1,r2))
-                                    #print "r1 r2 appended"
+                                if len(multi_read2) == 0 : 
+                                    for r in multi_read1 :
+                                        alignments_per_read.append((r,None))
+                                if len(multi_read1) == 0:
+                                    for r in multi_read2 :
+                                        alignments_per_read.append((None,r))
+                                if len(multi_read2) == len(multi_read1) :
+                                  for i in range(len(multi_read1)) :
+                                    read1 = multi_read1[i]
+                                    read2 = multi_read2[i]
+                                    alignments_per_read.append((read1,read2))
+                            else: 
+######## new counting ###############################
+                                #sys.stderr.write("save alignments per read\n")
+                                print "multi_read1: ", len(multi_read1)
+                                print "multi_read2: ", len(multi_read2)
+                              
+                                larger_cnt =  max(len(multi_read1), len(multi_read2))
+                                print larger_cnt
+                                for c in range(larger_cnt): 
+                                    #singlton
+                                    if len(multi_read2) == 0 :
+                                        r1 = multi_read1.pop(0)
+                                        alignments_per_read.append((r1,None))
+                                        print "r1 appended"
+                                    elif len(multi_read1) == 0:
+                                        r2 = multi_read2.pop(0)
+                                        alignments_per_read.append((None, r2))
+                                        print "r2 appended"
+                                    else: 
+                                        r1 = multi_read1.pop(0)
+                                        r2 = multi_read2.pop(0)
+                                        alignments_per_read.append((r1,r2))
+                                        print "r1 r2 appended"
 
-                            #print "SAVED ALL COLLECTED READS"
-                            #for r1,r2 in alignments_per_read :
-                                #print "r1: ", r1
-                                #print "r2: ", r2
-
+                                print "SAVED ALL COLLECTED READS"
+                                for r1,r2 in alignments_per_read :
+                                    print "r1: ", r1
+                                    print "r2: ", r2
+###################################################
 
             else : #single end read
                     if cur_read_name == prev_read_name or prev_read_name == "":
@@ -497,12 +521,18 @@ def count_transcript_abundance(filename, format, geneIdx, teIdx, intronIdx, stra
             if not aligned_read.is_paired :
                 alignments_per_read.append((aligned_read,None))
             else :
-                #if aligned_read.is_read1 :
-                if (aligned_read.query_name[added_flag_pos+1]=="1"):
-                    multi_read1.append(aligned_read)
-                #if aligned_read.is_read2 :
-                if (aligned_read.query_name[added_flag_pos+1]=="2"):
-                    multi_read2.append(aligned_read)
+                if (b_origcnt): 
+                    if aligned_read.is_read1 :
+                        multi_read1.append(aligned_read)
+                    if aligned_read.is_read2 :
+                        multi_read2.append(aligned_read)
+                else:
+######## new counting ###############################
+                    if (aligned_read.query_name[added_flag_pos+1]=="1"):
+                        multi_read1.append(aligned_read)
+                    if (aligned_read.query_name[added_flag_pos+1]=="2"):
+                        multi_read2.append(aligned_read)
+#####################################################
 
     except StopIteration:
             pass
@@ -977,8 +1007,8 @@ def main():
     # Read sample files make count table
     info("\nReading sample files ...\n")
 
-    (tsamples_ele_tbl, tsamples_instance_tbl, tsamples_rpm) = count_reads(args.tfiles, args.parser, geneIdx, teIdx, intronIdx, args.stranded, args.te_mode, args.sortByPos, args.prj_name,args.numItr,args.fragLength,args.maxL)
-    (csamples_ele_tbl, csamples_instance_tbl, csamples_rpm) = count_reads(args.cfiles, args.parser, geneIdx, teIdx, intronIdx, args.stranded, args.te_mode, args.sortByPos, args.prj_name,args.numItr,args.fragLength,args.maxL)
+    (tsamples_ele_tbl, tsamples_instance_tbl, tsamples_rpm) = count_reads(args.tfiles, args.parser, geneIdx, teIdx, intronIdx, args.stranded, args.te_mode, args.sortByPos, args.prj_name,args.numItr,args.fragLength,args.maxL, args.b_origcnt)
+    (csamples_ele_tbl, csamples_instance_tbl, csamples_rpm) = count_reads(args.cfiles, args.parser, geneIdx, teIdx, intronIdx, args.stranded, args.te_mode, args.sortByPos, args.prj_name,args.numItr,args.fragLength,args.maxL, args.b_origcnt)
     
     info("Finished processing sample files")
 
