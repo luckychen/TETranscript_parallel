@@ -17,6 +17,7 @@ import logging
 from math import ceil,floor
 from ItvTree import ItvTree
 from Constants import TEindex_BINSIZE
+from Constants import ReadLength
 
 #TEindex_BINSIZE = 200
 
@@ -48,11 +49,11 @@ class TEfeatures:
     def initRightIntronIDmap(self,maxSize) :
         self._rightIntronIDmap = [None]*maxSize
 
-    def getLeftIntronIdx(self,idx) :
-        return self._leftIntronIDmap[idx]
+    def getLeftIntrons(self) :
+        return self._leftIntronIDmap
 
-    def getRightIntronIdx(self,idx) :
-        return self._rightIntronIDmap[idx]
+    def getRightIntrons(self) :
+        return self._rightIntronIDmap
 
     def setLeftIntronIdx(self,idx, val) :
         self._leftIntronIDmap[idx] = val
@@ -196,12 +197,15 @@ class TEfeatures:
     # count by Instance name
     def countByName(self,te_inst_counts) :
         #print "countByName"
-        TEnames = self.getNames()
+        TEnames = self._nameIDmap
         #print TEnames
         #print te_inst_counts
         assert len(TEnames) == len(te_inst_counts)
         te_name_counts = dict(zip(TEnames,te_inst_counts))
         return te_name_counts
+
+
+
 
     def build (self,filename,te_mode):
             self.__srcfile = filename
@@ -313,8 +317,8 @@ class IntronFeatures(TEfeatures, object):
         self._right2TEIDmap = []
 
         super(IntronFeatures, self).__init__()
-        self._TEidx.initLeftIntronIDmap(self._TEidx.numInstances()*2+2)
-        self._TEidx.initRightIntronIDmap(self._TEidx.numInstances()*2+2)
+        self._TEidx.initLeftIntronIDmap(self._TEidx.numInstances())
+        self._TEidx.initRightIntronIDmap(self._TEidx.numInstances())
         
 
     def getTEidx(self) :
@@ -377,6 +381,62 @@ class IntronFeatures(TEfeatures, object):
                     sys.exit(1)
 
         return te_ele_counts
+
+
+
+
+    # discount TEcounts by flanking intron depth
+    def discountByFlankingIntrons(self,te_inst_counts, intron_counts) :
+        new_te_inst_counts = list(te_inst_counts) 
+        TEidx = self._TEidx
+        TEnames = TEidx.getNames()
+        leftIntrons = TEidx.getLeftIntrons()
+        rightIntrons = TEidx.getRightIntrons()
+        assert len(TEnames) == len(te_inst_counts)
+        assert len(TEnames) == len(leftIntrons)
+        assert len(TEnames) == len(rightIntrons)
+        for i in range(len(TEnames)):
+            print TEnames[i]
+            TEcnt = te_inst_counts[i]
+            TElen = TEidx.getLength(i)
+            TEefflen = TElen - ReadLength + 1
+            if TEefflen < 0:
+                TEefflen = TElen
+            TEdepth = TEcnt/TEefflen
+            leftdepth = 0
+            rightdepth = 0
+            leftintronidx = leftIntrons[i]
+            if leftintronidx:
+                leftintronlen = self.getLength(leftintronidx)
+                leftefflen = leftintronlen - ReadLength + 1
+                if (leftefflen < 0): 
+                    leftefflen = leftintronlen
+                leftintroncnt = intron_counts[leftintronidx]
+                print "leftcnt", leftintroncnt, " leftlen", leftintronlen    
+                leftdepth = leftintroncnt/leftefflen
+            rightintronidx = rightIntrons[i]
+            if rightintronidx:
+                rightintronlen = self.getLength(rightintronidx)
+                rightefflen = rightintronlen - ReadLength + 1
+                if (rightefflen < 0): 
+                    rightefflen = rightintronlen
+                rightintroncnt = intron_counts[rightintronidx]
+                print "rightcnt", rightintroncnt, " rightlen", rightintronlen    
+                rightdepth = rightintroncnt/rightefflen
+            if (leftintronidx is None and rightintronidx is None):
+                new_te_inst_counts[i] = 0
+            if (TEcnt == 0):
+                new_te_inst_counts[i] = 0
+            else:
+                meanintrondepth = (leftdepth + rightdepth)/((leftintronidx is not None) + (rightintronidx is not None))
+                discount = meanintrondepth/TEdepth
+                new_te_inst_counts[i] = TEcnt - TEcnt*discount
+                if new_te_inst_counts[i] < 0:
+                    new_te_inst_counts[i] = 0
+                print leftdepth, " ", rightdepth, " ", TEdepth," ", TEcnt, " ", new_te_inst_counts[i] 
+        return new_te_inst_counts
+
+
 
 
     def build(self,filename,te_mode):

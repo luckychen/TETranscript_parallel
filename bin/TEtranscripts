@@ -92,6 +92,8 @@ class UnknownChrom(Exception):
 def count_reads(samples, format, geneIdx, teIdx, intronIdx, stranded, te_mode, sortByPos, prj_name,numItr,fragLength,maxL, b_origcnt):
     cnt_ele_tbl = {}
     cnt_instance_tbl = {}
+    discounted_ele_tbl = {}
+    discounted_instance_tbl = {}
     libsize = []
     # check input files exist or not
     for filename in samples :
@@ -112,6 +114,12 @@ def count_reads(samples, format, geneIdx, teIdx, intronIdx, stranded, te_mode, s
                 intron_ele_counts = intronIdx.groupByEle(intron_counts)
                 cnt_ele_tbl[filename] = dict(gene_counts.items() + te_ele_counts.items() + intron_ele_counts.items())
                 cnt_instance_tbl[filename] = dict(gene_counts.items() + te_i_cnts_dict.items() + intron_cnts_dict.items())
+                
+                discounted_te_instance_counts = intronIdx.discountByFlankingIntrons(te_instance_counts, intron_counts)
+                discounted_te_ele_counts = teIdx.groupByEle(discounted_te_instance_counts)
+                discounted_instance_tbl[filename] = teIdx.countByName(discounted_te_instance_counts)
+                discounted_ele_tbl[filename] = dict(discounted_te_ele_counts.items())
+
                 total_ele_reads = sum(gene_counts.values())+sum(te_ele_counts.values())+sum(intron_ele_counts.values())
                 total_instance_reads = sum(gene_counts.values())+sum(te_i_cnts_dict.values())+sum(intron_cnts_dict.values())
             else:
@@ -131,7 +139,7 @@ def count_reads(samples, format, geneIdx, teIdx, intronIdx, stranded, te_mode, s
                             traceback.extract_tb( sys.exc_info()[2] )[-1][1] ) )
         sys.exit(1)
 
-    return (cnt_ele_tbl,cnt_instance_tbl,libsize)
+    return (cnt_ele_tbl,cnt_instance_tbl,discounted_ele_tbl,discounted_instance_tbl,libsize)
 
 
 #read assignment
@@ -419,31 +427,31 @@ def count_transcript_abundance(filename, format, geneIdx, teIdx, intronIdx, stra
                             else: 
 ######## new counting ###############################
                                 #sys.stderr.write("save alignments per read\n")
-                                print "multi_read1: ", len(multi_read1)
-                                print "multi_read2: ", len(multi_read2)
+                                #print "multi_read1: ", len(multi_read1)
+                                #print "multi_read2: ", len(multi_read2)
                               
                                 larger_cnt =  max(len(multi_read1), len(multi_read2))
-                                print larger_cnt
+                                #print larger_cnt
                                 for c in range(larger_cnt): 
                                     #singlton
                                     if len(multi_read2) == 0 :
                                         r1 = multi_read1.pop(0)
                                         alignments_per_read.append((r1,None))
-                                        print "r1 appended"
+                                        #print "r1 appended"
                                     elif len(multi_read1) == 0:
                                         r2 = multi_read2.pop(0)
                                         alignments_per_read.append((None, r2))
-                                        print "r2 appended"
+                                        #print "r2 appended"
                                     else: 
                                         r1 = multi_read1.pop(0)
                                         r2 = multi_read2.pop(0)
                                         alignments_per_read.append((r1,r2))
-                                        print "r1 r2 appended"
+                                        #print "r1 r2 appended"
 
-                                print "SAVED ALL COLLECTED READS"
-                                for r1,r2 in alignments_per_read :
-                                    print "r1: ", r1
-                                    print "r2: ", r2
+                                #print "SAVED ALL COLLECTED READS"
+                                #for r1,r2 in alignments_per_read :
+                                    #print "r1: ", r1
+                                    #print "r2: ", r2
 ###################################################
 
             else : #single end read
@@ -1007,8 +1015,8 @@ def main():
     # Read sample files make count table
     info("\nReading sample files ...\n")
 
-    (tsamples_ele_tbl, tsamples_instance_tbl, tsamples_rpm) = count_reads(args.tfiles, args.parser, geneIdx, teIdx, intronIdx, args.stranded, args.te_mode, args.sortByPos, args.prj_name,args.numItr,args.fragLength,args.maxL, args.b_origcnt)
-    (csamples_ele_tbl, csamples_instance_tbl, csamples_rpm) = count_reads(args.cfiles, args.parser, geneIdx, teIdx, intronIdx, args.stranded, args.te_mode, args.sortByPos, args.prj_name,args.numItr,args.fragLength,args.maxL, args.b_origcnt)
+    (tsamples_ele_tbl, tsamples_instance_tbl, discounted_t_ele_tbl, discounted_t_i_tbl, tsamples_rpm) = count_reads(args.tfiles, args.parser, geneIdx, teIdx, intronIdx, args.stranded, args.te_mode, args.sortByPos, args.prj_name,args.numItr,args.fragLength,args.maxL, args.b_origcnt)
+    (csamples_ele_tbl, csamples_instance_tbl, discounted_c_ele_tbl, discounted_c_i_tbl, csamples_rpm) = count_reads(args.cfiles, args.parser, geneIdx, teIdx, intronIdx, args.stranded, args.te_mode, args.sortByPos, args.prj_name,args.numItr,args.fragLength,args.maxL, args.b_origcnt)
     
     info("Finished processing sample files")
 
@@ -1016,8 +1024,12 @@ def main():
 
     f_ele_tbl = args.prj_name + ".ele.cntTable"
     f_instance_tbl = args.prj_name + ".instance.cntTable"
+    f_discounted_ele_tbl = args.prj_name + ".discount.ele.cntTable"
+    f_discounted_instance_tbl = args.prj_name + ".discount.instance.cntTable"
     output_count_tbl(tsamples_ele_tbl, csamples_ele_tbl, f_ele_tbl)
     output_count_tbl(tsamples_instance_tbl, csamples_instance_tbl, f_instance_tbl)
+    output_count_tbl(discounted_t_ele_tbl, discounted_c_ele_tbl, f_discounted_ele_tbl)
+    output_count_tbl(discounted_t_i_tbl, discounted_c_i_tbl, f_discounted_instance_tbl)
     rpm_val = tsamples_rpm + csamples_rpm
 
     sys.exit(0)

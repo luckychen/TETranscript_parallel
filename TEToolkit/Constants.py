@@ -21,6 +21,7 @@ MM_CHROM = 'data/mm9_chromsize'
 DM_CHROM = 'data/dm3_chromsize'
 MAX_BIT = 50000
 
+ReadLength = 75
 TEindex_BINSIZE = 500
 OPT_TOL = 0.0001 #tolerance for iterative optimization
 
