@@ -488,10 +488,10 @@ class IntronFeatures(TEfeatures, object):
         assert len(TEnames) == len(leftIntrons)
         assert len(TEnames) == len(rightIntrons)
         for i in range(len(TEnames)):
-            if self._exonicTEs.has_key(TEnames[i]) :        # cannot reliably count TEs in exons (including lncRNA). 
+            if TEidx._exonicTEs.has_key(TEnames[i]) :        # cannot reliably count TEs in exons (including lncRNA). 
                 new_te_inst_counts[i] = 0
                 continue
-            if self._intergenicTEs.has_key(TEnames[i]) :    # no flanking intron or pre-mRNA to worry about. 
+            if TEidx._intergenicTEs.has_key(TEnames[i]) :    # no flanking intron or pre-mRNA to worry about. 
                 new_te_inst_counts[i] = te_inst_counts[i]
                 continue
 

@@ -41,7 +41,7 @@ def prepare_parser():
 
     parser.add_argument('-t','--treatment', metavar='treatment sample', dest='tfiles',nargs='+', required=True,
                         help='Sample files in group 1 (e.g. treatment/mutant)')
-    parser.add_argument('-c','--control', metavar='control sample', dest='cfiles',nargs='+', required=True,
+    parser.add_argument('-c','--control', metavar='control sample', dest='cfiles',nargs='+', required=False,
                         help='Sample files in group 2 (e.g. control/wildtype)')
     parser.add_argument('--GTF', metavar='genic-GTF-file', dest='gtffile', type=str, required=True,
                         help='GTF file for gene annotations')
@@ -776,9 +776,10 @@ def output_count_tbl(t_tbl, c_tbl, fname):
         for tsmp in t_tbl.keys():                   # tsmp: treatment sample filenames
             keys = keys.union(t_tbl[tsmp].keys())
             header +="\t"+tsmp+".T"
-        for csmp in c_tbl.keys():                   # csmp: treatment sample filenames
-            keys = keys.union(c_tbl[csmp].keys())
-            header +="\t"+csmp+".C"
+        if c_tbl:
+            for csmp in c_tbl.keys():                   # csmp: treatment sample filenames
+                keys = keys.union(c_tbl[csmp].keys())
+                header +="\t"+csmp+".C"
 
         for tsmp in t_tbl.keys():
             cnts = t_tbl[tsmp]
@@ -795,22 +796,23 @@ def output_count_tbl(t_tbl, c_tbl, fname):
                     vallist.append(int(round(val)))
                     cnt_tbl[k] = vallist
 
-        for csmp in c_tbl.keys():
-            cnts = c_tbl[csmp]
-            for k in keys:
-                val = 0
-                if k in cnts :
-                    val = cnts[k]
-                    if val is None or val is "":
+        if c_tbl:
+            for csmp in c_tbl.keys():
+                cnts = c_tbl[csmp]
+                for k in keys:
+                    val = 0
+                    if k in cnts :
+                        val = cnts[k]
+                        if val is None or val is "":
+                            sys.exit(1)
+                    if cnt_tbl.has_key(k) :
+                        cnt_tbl[k].append(int(round(val)))
+                    else :
+                        print "we should never come here, right?"
                         sys.exit(1)
-                if cnt_tbl.has_key(k) :
-                    cnt_tbl[k].append(int(round(val)))
-                else :
-                    print "we should never come here, right?"
-                    sys.exit(1)
-                    vallist = []
-                    vallist.append(int(round(val)))
-                    cnt_tbl[k] = vallist
+                        vallist = []
+                        vallist.append(int(round(val)))
+                        cnt_tbl[k] = vallist
         #output
         f.write(header + "\n")
         for gene in sorted(cnt_tbl.keys()) :
@@ -1032,8 +1034,14 @@ def main():
     # Read sample files make count table
     info("\nReading sample files ...\n")
 
+    csamples_ele_tbl = None
+    csamples_instance_tbl = None
+    discounted_c_ele_tbl = None
+    discounted_c_i_tbl = None
+    csamples_rpm = 0
     (tsamples_ele_tbl, tsamples_instance_tbl, discounted_t_ele_tbl, discounted_t_i_tbl, tsamples_rpm) = count_reads(args.tfiles, args.parser, geneIdx, teIdx, intronIdx, args.stranded, args.te_mode, args.sortByPos, args.prj_name,args.numItr,args.fragLength,args.maxL, args.b_origcnt)
-    (csamples_ele_tbl, csamples_instance_tbl, discounted_c_ele_tbl, discounted_c_i_tbl, csamples_rpm) = count_reads(args.cfiles, args.parser, geneIdx, teIdx, intronIdx, args.stranded, args.te_mode, args.sortByPos, args.prj_name,args.numItr,args.fragLength,args.maxL, args.b_origcnt)
+    if args.cfiles:
+        (csamples_ele_tbl, csamples_instance_tbl, discounted_c_ele_tbl, discounted_c_i_tbl, csamples_rpm) = count_reads(args.cfiles, args.parser, geneIdx, teIdx, intronIdx, args.stranded, args.te_mode, args.sortByPos, args.prj_name,args.numItr,args.fragLength,args.maxL, args.b_origcnt)
     
     info("Finished processing sample files")
 
@@ -1047,7 +1055,10 @@ def main():
     output_count_tbl(tsamples_instance_tbl, csamples_instance_tbl, f_instance_tbl)
     output_count_tbl(discounted_t_ele_tbl, discounted_c_ele_tbl, f_discounted_ele_tbl)
     output_count_tbl(discounted_t_i_tbl, discounted_c_i_tbl, f_discounted_instance_tbl)
-    rpm_val = tsamples_rpm + csamples_rpm
+    if args.cfiles:
+        rpm_val = tsamples_rpm + csamples_rpm
+    else:
+        rpm_val = tsamples_rpm 
 
     sys.exit(0)
     #info("Calculating differential expression ...\n")

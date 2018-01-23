@@ -254,10 +254,11 @@ def read_opts2(parser):
             logging.error("No such file: %s !\n" % (args.tfiles[i]))
             sys.exit(1)
     # Obtain & store list of files for group2 (e.g. control/wildtype)
-    for i in range(len(args.cfiles)) :
-        if not os.path.isfile(args.cfiles[i]):
-            logging.error("No such file: %s !\n" % (args.cfiles[i]))
-            sys.exit(1)
+    if args.cfiles:
+        for i in range(len(args.cfiles)) :
+            if not os.path.isfile(args.cfiles[i]):
+                logging.error("No such file: %s !\n" % (args.cfiles[i]))
+                sys.exit(1)
     # Identify file format for subsequent processing (parsing)
     if args.format == "BAM" :
         args.parser = "BAM"
@@ -333,6 +334,8 @@ def read_opts2(parser):
                 "# GTF file = %s " % (args.gtffile), \
                 "# TE file = %s " % (args.tefile), \
                 "# intron file = %s " % (args.intronfile), \
+                "# exonic TE file = %s " % (args.exontefile), \
+                "# intergenic TE file = %s " % (args.intergenictefile), \
                 "# multi-mapper mode = %s " % (args.te_mode), \
                 "# stranded = %s " % (args.stranded), \
                 "# normalization = %s (rpm: Reads Per Million mapped; quant: Quantile normalization)" % (args.norm), \
