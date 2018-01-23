@@ -49,6 +49,10 @@ def prepare_parser():
                         help='GTF file for transposable element annotations')
     parser.add_argument('--intron', metavar='intron-GTF-file', dest='intronfile', type=str, required=False,
                         help='GTF file for introns flanking transposable elements')
+    parser.add_argument('--exonTE', metavar='exon-TE-GTF-file', dest='exontefile', type=str, required=False,
+                        help='GTF file for transposable elements overlapping known exons')
+    parser.add_argument('--intergenicTE', metavar='intergenic-TE-GTF-file', dest='intergenictefile', type=str, required=False,
+                        help='GTF file for transposable elements between genes')
     parser.add_argument('--format', metavar='input file format', dest='format', type=str, nargs='?', default='BAM', choices=['BAM','SAM'],
                         help='Input file format: BAM or SAM. DEFAULT: BAM')
     parser.add_argument('--stranded', metavar='option', dest='stranded', nargs='?', type=str, default="yes", choices=['yes','no','reverse'],
@@ -114,7 +118,7 @@ def count_reads(samples, format, geneIdx, teIdx, intronIdx, stranded, te_mode, s
                 intron_ele_counts = intronIdx.groupByEle(intron_counts)
                 cnt_ele_tbl[filename] = dict(gene_counts.items() + te_ele_counts.items() + intron_ele_counts.items())
                 cnt_instance_tbl[filename] = dict(gene_counts.items() + te_i_cnts_dict.items() + intron_cnts_dict.items())
-                
+               
                 discounted_te_instance_counts = intronIdx.discountByFlankingIntrons(te_instance_counts, intron_counts)
                 discounted_te_ele_counts = teIdx.groupByEle(discounted_te_instance_counts)
                 discounted_instance_tbl[filename] = teIdx.countByName(discounted_te_instance_counts)
@@ -1006,9 +1010,22 @@ def main():
             info("\nBuilding intron index .......\n")
             intronIdx.build(args.intronfile,args.te_mode)
             info("Done building intron index ......\n")
+        if args.exontefile:
+            info("\nReading exonic TEs .......\n")
+            teIdx.dictExonicTEs(args.exontefile) 
+            info("\nDone reading exonic TEs .......\n")
+        else: 
+            sys.stderr.write("if intron gtf is provided exonicTEs and intergeneTEs have to be provided as well. \n")
+        if args.intergenictefile:
+            info("\nReading intergenic TEs .......\n")
+            teIdx.dictIntergenicTEs(args.intergenictefile) 
+            info("\nDone reading intergenic TEs .......\n")
+        else:
+            sys.stderr.write("if intron gtf is provided exonicTEs and intergeneTEs have to be provided as well. \n")
     #except :
     #    sys.stderr.write("Error in building intron flanking intron index \n")
     #    sys.exit(1)
+
 
 
 

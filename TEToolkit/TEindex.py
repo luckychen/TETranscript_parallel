@@ -32,6 +32,8 @@ class TEfeatures:
         self._elements = []
         self._leftIntronIDmap = [] 
         self._rightIntronIDmap = [] 
+        self._intergenicTEs = {}
+        self._exonicTEs = {}
 
     def getNames(self) :
         names = []
@@ -159,7 +161,7 @@ class TEfeatures:
             if name_idx_list is not None :
                 for (t,ovp_len) in name_idx_list :
                     if strand != "." : #stranded
-                        if strand == self.getStrand(t)  :
+                        if (strand == self.getStrand(t)) and (ovp_len >= 5) :   # strand matches and overlap is at least 5 bases
                             if t not in TEs :
                                 #print self.getFullName(t), " appended"
                                 TEs.append([t,ovp_len])
@@ -168,8 +170,9 @@ class TEfeatures:
                         #else: 
                             #print "strand ", strand, " != ", self.getStrand(t)
                     else :#not stranded
-                        if t not in TEs :
-                            TEs.append([t,ovp_len])
+                        if ovp_len >= 5 :   # overlap is at least 5 bases
+                            if t not in TEs :
+                                TEs.append([t,ovp_len])
 
         return TEs
 
@@ -298,6 +301,95 @@ class TEfeatures:
             f.close()
 
 
+    def dictIntergenicTEs(self,filename):
+        try:
+            f = open(filename,'r')
+        except:
+            logging.error("cannot open such file %s !\n" %(filename))
+            sys.exit(1)
+
+        linenum = 0
+        for line in f :
+            line = line.strip()
+            items = line.split('\t')
+            strand = items[6]
+            items[8] = items[8].replace("; ",";")
+            desc = items[8].split(';')
+            name = ""
+            family_id = ""
+            ele_id = ""
+            class_id = ""
+            linenum += 1
+
+            for i in range(len(desc)) :
+                desc[i] = desc[i].replace("\"","")
+                pos = desc[i].find(" ")
+                tid = desc[i][:pos]
+                val = desc[i][pos+1:len(desc[i])]
+
+                if tid == "gene_id" :
+                    ele_id = val
+                if tid == "transcript_id" :
+                    name = val
+                if tid == "family_id" :
+                    family_id = val
+                if tid == "class_id" :
+                    class_id = val
+
+            if ele_id == "" or name == "" or family_id == "" or class_id == "" :
+                sys.stderr.write(line+"\n")
+                sys.stderr.write("TE GTF format error! There is no annotation at line %s.\n" % (linenum))
+                raise
+
+            full_name = name+':'+ele_id+':'+family_id+':'+class_id+':'+strand
+            self._intergenicTEs[full_name] = 1
+
+
+    def dictExonicTEs(self,filename):
+        try:
+            f = open(filename,'r')
+        except:
+            logging.error("cannot open such file %s !\n" %(filename))
+            sys.exit(1)
+
+        linenum = 0
+        for line in f :
+            line = line.strip()
+            items = line.split('\t')
+            strand = items[6]
+            items[8] = items[8].replace("; ",";")
+            desc = items[8].split(';')
+            name = ""
+            family_id = ""
+            ele_id = ""
+            class_id = ""
+            linenum += 1
+
+            for i in range(len(desc)) :
+                desc[i] = desc[i].replace("\"","")
+                pos = desc[i].find(" ")
+                tid = desc[i][:pos]
+                val = desc[i][pos+1:len(desc[i])]
+
+                if tid == "gene_id" :
+                    ele_id = val
+                if tid == "transcript_id" :
+                    name = val
+                if tid == "family_id" :
+                    family_id = val
+                if tid == "class_id" :
+                    class_id = val
+
+            if ele_id == "" or name == "" or family_id == "" or class_id == "" :
+                sys.stderr.write(line+"\n")
+                sys.stderr.write("TE GTF format error! There is no annotation at line %s.\n" % (linenum))
+                raise
+
+            full_name = name+':'+ele_id+':'+family_id+':'+class_id+':'+strand
+            self._exonicTEs[full_name] = 1
+        
+
+
 
 
 
@@ -396,12 +488,21 @@ class IntronFeatures(TEfeatures, object):
         assert len(TEnames) == len(leftIntrons)
         assert len(TEnames) == len(rightIntrons)
         for i in range(len(TEnames)):
-            print TEnames[i]
+            if self._exonicTEs.has_key(TEnames[i]) :        # cannot reliably count TEs in exons (including lncRNA). 
+                new_te_inst_counts[i] = 0
+                continue
+            if self._intergenicTEs.has_key(TEnames[i]) :    # no flanking intron or pre-mRNA to worry about. 
+                new_te_inst_counts[i] = te_inst_counts[i]
+                continue
+
+            # remaining TEs are within introns
             TEcnt = te_inst_counts[i]
             TElen = TEidx.getLength(i)
+            if (TElen == 0):
+                print "length zero!"
             TEefflen = TElen - ReadLength + 1
-            if TEefflen < 0:
-                TEefflen = TElen
+            if TEefflen <= 0:
+                TEefflen = 1
             TEdepth = TEcnt/TEefflen
             leftdepth = 0
             rightdepth = 0
@@ -409,31 +510,33 @@ class IntronFeatures(TEfeatures, object):
             if leftintronidx:
                 leftintronlen = self.getLength(leftintronidx)
                 leftefflen = leftintronlen - ReadLength + 1
-                if (leftefflen < 0): 
-                    leftefflen = leftintronlen
+                if (leftefflen <= 0): 
+                    leftefflen = 1
                 leftintroncnt = intron_counts[leftintronidx]
-                print "leftcnt", leftintroncnt, " leftlen", leftintronlen    
+                #print "leftcnt", leftintroncnt, " leftlen", leftintronlen    
                 leftdepth = leftintroncnt/leftefflen
             rightintronidx = rightIntrons[i]
             if rightintronidx:
                 rightintronlen = self.getLength(rightintronidx)
                 rightefflen = rightintronlen - ReadLength + 1
-                if (rightefflen < 0): 
-                    rightefflen = rightintronlen
+                if (rightefflen <= 0): 
+                    rightefflen = 1
                 rightintroncnt = intron_counts[rightintronidx]
-                print "rightcnt", rightintroncnt, " rightlen", rightintronlen    
+                #print "rightcnt", rightintroncnt, " rightlen", rightintronlen    
                 rightdepth = rightintroncnt/rightefflen
-            if (leftintronidx is None and rightintronidx is None):
-                new_te_inst_counts[i] = 0
-            if (TEcnt == 0):
+            if (TEdepth < 1):
                 new_te_inst_counts[i] = 0
             else:
-                meanintrondepth = (leftdepth + rightdepth)/((leftintronidx is not None) + (rightintronidx is not None))
-                discount = meanintrondepth/TEdepth
-                new_te_inst_counts[i] = TEcnt - TEcnt*discount
-                if new_te_inst_counts[i] < 0:
+                if ((leftintronidx is None) and (rightintronidx is None)):      # maybe merged TEs
                     new_te_inst_counts[i] = 0
-                print leftdepth, " ", rightdepth, " ", TEdepth," ", TEcnt, " ", new_te_inst_counts[i] 
+                else:
+                    #print TEnames[i]
+                    meanintrondepth = (leftdepth + rightdepth)/((leftintronidx is not None) + (rightintronidx is not None))
+                    discount = meanintrondepth/TEdepth
+                    new_te_inst_counts[i] = TEcnt - TEcnt*discount
+                    if new_te_inst_counts[i] < 0:
+                        new_te_inst_counts[i] = 0
+                    #print leftdepth, " ", rightdepth, " ", TEdepth," ", TEcnt, " ", new_te_inst_counts[i] 
         return new_te_inst_counts
 
 
@@ -611,6 +714,8 @@ class IntronFeatures(TEfeatures, object):
                             introns.append([t,ovp_len])
 
         return introns
+
+
 
 
 
