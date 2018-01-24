@@ -302,6 +302,7 @@ class TEfeatures:
 
 
     def dictIntergenicTEs(self,filename):
+        newdict = {}
         try:
             f = open(filename,'r')
         except:
@@ -342,10 +343,15 @@ class TEfeatures:
                 raise
 
             full_name = name+':'+ele_id+':'+family_id+':'+class_id+':'+strand
-            self._intergenicTEs[full_name] = 1
+            newdict[full_name] = 1
+
+        #print "intergenicTEs"
+        #print newdict
+        self._intergenicTEs = newdict
 
 
     def dictExonicTEs(self,filename):
+        newdict = {}
         try:
             f = open(filename,'r')
         except:
@@ -386,7 +392,11 @@ class TEfeatures:
                 raise
 
             full_name = name+':'+ele_id+':'+family_id+':'+class_id+':'+strand
-            self._exonicTEs[full_name] = 1
+            newdict[full_name] = 1
+
+        #print "exonicTEs"
+        #print newdict
+        self._exonicTEs = newdict
         
 
 
@@ -487,6 +497,10 @@ class IntronFeatures(TEfeatures, object):
         assert len(TEnames) == len(te_inst_counts)
         assert len(TEnames) == len(leftIntrons)
         assert len(TEnames) == len(rightIntrons)
+        #print "exonicTEs"
+        #print TEidx._exonicTEs
+        #print "intergenicTEs"
+        #print TEidx._intergenicTEs
         for i in range(len(TEnames)):
             if TEidx._exonicTEs.has_key(TEnames[i]) :        # cannot reliably count TEs in exons (including lncRNA). 
                 new_te_inst_counts[i] = 0

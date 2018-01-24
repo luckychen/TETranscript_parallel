@@ -970,6 +970,19 @@ def main():
             teIdx.build(args.tefile,args.te_mode)
             #subprocess.call(['rm -f ' + te_tmpfile ],shell=True)
             info("Done building TE index ......\n")
+            if args.intronfile:
+                if args.exontefile:
+                    info("\nReading exonic TEs .......\n")
+                    teIdx.dictExonicTEs(args.exontefile) 
+                    info("\nDone reading exonic TEs .......\n")
+                else: 
+                    sys.stderr.write("if intron gtf is provided exonicTEs and intergeneTEs have to be provided as well. \n")
+                if args.intergenictefile:
+                    info("\nReading intergenic TEs .......\n")
+                    teIdx.dictIntergenicTEs(args.intergenictefile) 
+                    info("\nDone reading intergenic TEs .......\n")
+                else:
+                    sys.stderr.write("if intron gtf is provided exonicTEs and intergeneTEs have to be provided as well. \n")
             info("\nDumping TE pickle .......\n")
             with open(te_picklefile, 'wb') as fp:
                 pickle.dump(teIdx, fp, protocol=pickle.HIGHEST_PROTOCOL)
@@ -981,6 +994,21 @@ def main():
         teIdx.build(args.tefile,args.te_mode)
         #subprocess.call(['rm -f ' + te_tmpfile ],shell=True)
         info("Done building TE index ......\n")
+        if args.intronfile:
+            if args.exontefile:
+                info("\nReading exonic TEs .......\n")
+                teIdx.dictExonicTEs(args.exontefile) 
+                info("\nDone reading exonic TEs .......\n")
+            else: 
+                sys.stderr.write("if intron gtf is provided exonicTEs and intergeneTEs have to be provided as well. \n")
+            if args.intergenictefile:
+                info("\nReading intergenic TEs .......\n")
+                teIdx.dictIntergenicTEs(args.intergenictefile) 
+                info("\nDone reading intergenic TEs .......\n")
+            else:
+                sys.stderr.write("if intron gtf is provided exonicTEs and intergeneTEs have to be provided as well. \n")
+
+
 #except :
 #    sys.stderr.write("Error in building TE index \n")
 #    sys.exit(1)
@@ -1012,18 +1040,7 @@ def main():
             info("\nBuilding intron index .......\n")
             intronIdx.build(args.intronfile,args.te_mode)
             info("Done building intron index ......\n")
-        if args.exontefile:
-            info("\nReading exonic TEs .......\n")
-            teIdx.dictExonicTEs(args.exontefile) 
-            info("\nDone reading exonic TEs .......\n")
-        else: 
-            sys.stderr.write("if intron gtf is provided exonicTEs and intergeneTEs have to be provided as well. \n")
-        if args.intergenictefile:
-            info("\nReading intergenic TEs .......\n")
-            teIdx.dictIntergenicTEs(args.intergenictefile) 
-            info("\nDone reading intergenic TEs .......\n")
-        else:
-            sys.stderr.write("if intron gtf is provided exonicTEs and intergeneTEs have to be provided as well. \n")
+
     #except :
     #    sys.stderr.write("Error in building intron flanking intron index \n")
     #    sys.exit(1)
