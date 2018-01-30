@@ -29,6 +29,7 @@ class TEfeatures:
         self.indexlist = {}
         self._length = []
         self._nameIDmap = []
+        self._name2IDdict = {}
         self._elements = []
         self._leftIntronIDmap = [] 
         self._rightIntronIDmap = [] 
@@ -43,7 +44,10 @@ class TEfeatures:
         return len(self._nameIDmap)
 
     def getElements(self) :
-         return self._elements
+        return self._elements
+
+    def getIdxbyName(self, name):
+        return self._name2IDdict[name]
 
     def initLeftIntronIDmap(self,maxSize) :
         self._leftIntronIDmap = [None]*maxSize
@@ -211,94 +215,95 @@ class TEfeatures:
 
 
     def build (self,filename,te_mode):
-            self.__srcfile = filename
+        self.__srcfile = filename
 
-            try:
-                f = open(self.__srcfile,'r')
-            except:
-                logging.error("cannot open such file %s !\n" %(self.__srcfile))
-                sys.exit(1)
+        try:
+            f = open(self.__srcfile,'r')
+        except:
+            logging.error("cannot open such file %s !\n" %(self.__srcfile))
+            sys.exit(1)
 
-            name_idx = 0
-            linenum = 0
-            for line in f :
-                line = line.strip()
-                items = line.split('\t')
-                chrom = items[0]
-                start = int(items[3])
-                end = int(items[4])
-                strand = items[6]
-                items[8] = items[8].replace("; ",";")
-                desc = items[8].split(';')
-                name = ""
-                family_id = ""
-                ele_id = ""
-                class_id = ""
-                tlen = end - start + 1
-                linenum += 1
+        name_idx = 0
+        linenum = 0
+        for line in f :
+            line = line.strip()
+            items = line.split('\t')
+            chrom = items[0]
+            start = int(items[3])
+            end = int(items[4])
+            strand = items[6]
+            items[8] = items[8].replace("; ",";")
+            desc = items[8].split(';')
+            name = ""
+            family_id = ""
+            ele_id = ""
+            class_id = ""
+            tlen = end - start + 1
+            linenum += 1
 
-                for i in range(len(desc)) :
-                    desc[i] = desc[i].replace("\"","")
-                    pos = desc[i].find(" ")
-                    tid = desc[i][:pos]
-                    val = desc[i][pos+1:len(desc[i])]
+            for i in range(len(desc)) :
+                desc[i] = desc[i].replace("\"","")
+                pos = desc[i].find(" ")
+                tid = desc[i][:pos]
+                val = desc[i][pos+1:len(desc[i])]
 
-                    if tid == "gene_id" :
-                        ele_id = val
-                    if tid == "transcript_id" :
-                        name = val
-                    if tid == "family_id" :
-                        family_id = val
-                    if tid == "class_id" :
-                        class_id = val
+                if tid == "gene_id" :
+                    ele_id = val
+                if tid == "transcript_id" :
+                    name = val
+                if tid == "family_id" :
+                    family_id = val
+                if tid == "class_id" :
+                    class_id = val
 
-                if ele_id == "" or name == "" or family_id == "" or class_id == "" :
-                    sys.stderr.write(line+"\n")
-                    sys.stderr.write("TE GTF format error! There is no annotation at line %s.\n" % (linenum))
-                    raise
+            if ele_id == "" or name == "" or family_id == "" or class_id == "" :
+                sys.stderr.write(line+"\n")
+                sys.stderr.write("TE GTF format error! There is no annotation at line %s.\n" % (linenum))
+                raise
 
-                # name of TE is e.g.
-                # AluSp:AluSp:Alu:SINE:+
-                full_name = name+':'+ele_id+':'+family_id+':'+class_id+':'+strand
-                ele_name = ele_id+':'+family_id+':'+class_id
-                if ele_name not in self._elements :
-                    self._elements.append(ele_name)
+            # name of TE is e.g.
+            # AluSp:AluSp:Alu:SINE:+
+            full_name = name+':'+ele_id+':'+family_id+':'+class_id+':'+strand
+            ele_name = ele_id+':'+family_id+':'+class_id
+            if ele_name not in self._elements :
+                self._elements.append(ele_name)
 
-                self._length.append(tlen)
-                assert len(self._nameIDmap) == name_idx
-                self._nameIDmap.append(full_name)
+            self._length.append(tlen)
+            assert len(self._nameIDmap) == name_idx
+            self._nameIDmap.append(full_name)
+            self._name2IDdict[name] = name_idx
 
-                if self.indexlist.has_key(chrom) :
-                        index = self.indexlist[chrom]
+            if self.indexlist.has_key(chrom) :
+                    index = self.indexlist[chrom]
 
-                        bin_startID = start/TEindex_BINSIZE
-                        bin_endID = end/TEindex_BINSIZE
-                        if start == bin_startID * TEindex_BINSIZE :
-                            bin_startID -= 1
-                        while bin_startID <= bin_endID :
-                            end_pos = min(end,(bin_startID+1) * TEindex_BINSIZE )
-                            start_pos = max(start,bin_startID * TEindex_BINSIZE+1)
+                    bin_startID = start/TEindex_BINSIZE
+                    bin_endID = end/TEindex_BINSIZE
+                    if start == bin_startID * TEindex_BINSIZE :
+                        bin_startID -= 1
+                    while bin_startID <= bin_endID :
+                        end_pos = min(end,(bin_startID+1) * TEindex_BINSIZE )
+                        start_pos = max(start,bin_startID * TEindex_BINSIZE+1)
 
-                            index.insert(start_pos,end_pos,name_idx)
-                            bin_startID += 1
+                        index.insert(start_pos,end_pos,name_idx)
+                        bin_startID += 1
 
-                else :
-                        index = ItvTree()
-                        bin_startID = start/TEindex_BINSIZE
-                        bin_endID = end/TEindex_BINSIZE
-                        if start == bin_startID * TEindex_BINSIZE :
-                            bin_startID -= 1
-                        while bin_startID <= bin_endID :
-                            end_pos = min(end,(bin_startID+1) * TEindex_BINSIZE )
-                            start_pos = max(start,bin_startID * TEindex_BINSIZE+1)
-                            index.insert(start_pos,end_pos,name_idx)
-                            bin_startID += 1
+            else :
+                    index = ItvTree()
+                    bin_startID = start/TEindex_BINSIZE
+                    bin_endID = end/TEindex_BINSIZE
+                    if start == bin_startID * TEindex_BINSIZE :
+                        bin_startID -= 1
+                    while bin_startID <= bin_endID :
+                        end_pos = min(end,(bin_startID+1) * TEindex_BINSIZE )
+                        start_pos = max(start,bin_startID * TEindex_BINSIZE+1)
+                        index.insert(start_pos,end_pos,name_idx)
+                        bin_startID += 1
 
-                        self.indexlist[chrom] = index
+                    self.indexlist[chrom] = index
 
-                name_idx += 1
+            name_idx += 1
 
-            f.close()
+        f.close()
 
 
     def dictIntergenicTEs(self,filename):
@@ -415,8 +420,6 @@ class IntronFeatures(TEfeatures, object):
         self._start = []
         self._end = []
         self._TEidx = TEidx # TEfeatures idx object needs to be created already
-        self._left2TEIDmap = []
-        self._right2TEIDmap = []
 
         super(IntronFeatures, self).__init__()
         self._TEidx.initLeftIntronIDmap(self._TEidx.numInstances())
@@ -538,19 +541,24 @@ class IntronFeatures(TEfeatures, object):
                 rightintroncnt = intron_counts[rightintronidx]
                 #print "rightcnt", rightintroncnt, " rightlen", rightintronlen    
                 rightdepth = rightintroncnt/rightefflen
-            if (TEdepth < 1):
+
+            # assign new counts based on intron information
+            if ((leftintronidx is None) and (rightintronidx is None)):      # maybe merged TEs
+                print TEnames[i]
                 new_te_inst_counts[i] = 0
             else:
-                if ((leftintronidx is None) and (rightintronidx is None)):      # maybe merged TEs
-                    new_te_inst_counts[i] = 0
+                meanintrondepth = (leftdepth + rightdepth)/((leftintronidx is not None) + (rightintronidx is not None))
+                if (TEdepth < 1):
+                    if (meanintrondepth == 0):
+                        new_te_inst_counts[i] = te_inst_counts[i]
+                    else:
+                        new_te_inst_counts[i] = 0
                 else:
-                    #print TEnames[i]
-                    meanintrondepth = (leftdepth + rightdepth)/((leftintronidx is not None) + (rightintronidx is not None))
                     discount = meanintrondepth/TEdepth
                     new_te_inst_counts[i] = TEcnt - TEcnt*discount
                     if new_te_inst_counts[i] < 0:
                         new_te_inst_counts[i] = 0
-                    #print leftdepth, " ", rightdepth, " ", TEdepth," ", TEcnt, " ", new_te_inst_counts[i] 
+                #print leftdepth, " ", rightdepth, " ", TEdepth," ", TEcnt, " ", new_te_inst_counts[i] 
         return new_te_inst_counts
 
 
@@ -583,6 +591,8 @@ class IntronFeatures(TEfeatures, object):
             tlen = end - start + 1
             linenum += 1
             full_name = ""
+            left_TE_names = [] 
+            right_TE_names = [] 
 
             for i in range(len(desc)) :
                 desc[i] = desc[i].replace("\"","")
@@ -621,21 +631,21 @@ class IntronFeatures(TEfeatures, object):
 
                 # find out adjacent TE and save the idx
                 if (TEnextto == "left"): 
-                    TEidx_list  = self._TEidx.findOvpTE(chrom,end+1,end+1)
-                    #print "intron_left2TE: ", TEidx_list
-                    if TEidx_list: 
-                        #print self._TEidx.getInstanceName(TEidx_list[0][0]), "==", TEinstancename
-                        if (self._TEidx.getInstanceName(TEidx_list[0][0]) == TEinstancename):
-                            self._TEidx.setLeftIntronIdx(TEidx_list[0][0], name_idx)
-                            self._left2TEIDmap.append(TEidx_list[0])
+                    #TEidx_list  = self._TEidx.findOvpTE(chrom,end+1,end+1)
+                    ##print "intron_left2TE: ", TEidx_list
+                    #if TEidx_list: 
+                    #    #print self._TEidx.getInstanceName(TEidx_list[0][0]), "==", TEinstancename
+                    #    #if (self._TEidx.getInstanceName(TEidx_list[0][0]) == TEinstancename):
+                    #        self._TEidx.setLeftIntronIdx(TEidx_list[0][0], name_idx)
+                    self._TEidx.setLeftIntronIdx(self._TEidx.getIdxbyName(TEinstancename), name_idx)
                 if (TEnextto == "right"): 
-                    TEidx_list  = self._TEidx.findOvpTE(chrom,start-1,start-1)
-                    #print "intron_right2TE: ", TEidx_list
-                    if TEidx_list: 
-                        #print self._TEidx.getInstanceName(TEidx_list[0][0]), "==", TEinstancename
-                        if (self._TEidx.getInstanceName(TEidx_list[0][0]) == TEinstancename):
-                            self._TEidx.setRightIntronIdx(TEidx_list[0][0], name_idx)
-                            self._right2TEIDmap.append(TEidx_list[0])
+                    #TEidx_list  = self._TEidx.findOvpTE(chrom,start-1,start-1)
+                    ##print "intron_right2TE: ", TEidx_list
+                    #if TEidx_list: 
+                    #    #print self._TEidx.getInstanceName(TEidx_list[0][0]), "==", TEinstancename
+                    #    if (self._TEidx.getInstanceName(TEidx_list[0][0]) == TEinstancename):
+                    #        self._TEidx.setRightIntronIdx(TEidx_list[0][0], name_idx)
+                    self._TEidx.setRightIntronIdx(self._TEidx.getIdxbyName(TEinstancename), name_idx)
 
             assert len(self._nameIDmap) == name_idx
             self._start.append(start)
