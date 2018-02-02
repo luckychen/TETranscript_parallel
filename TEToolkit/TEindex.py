@@ -520,7 +520,7 @@ class IntronFeatures(TEfeatures, object):
             TEefflen = TElen - ReadLength + 1
             if TEefflen <= 0:
                 TEefflen = 1
-            TEdepth = TEcnt/TEefflen
+            TEdepth = TEcnt/float(TEefflen)
             leftdepth = 0
             rightdepth = 0
             leftintronidx = leftIntrons[i]
@@ -531,7 +531,7 @@ class IntronFeatures(TEfeatures, object):
                     leftefflen = 1
                 leftintroncnt = intron_counts[leftintronidx]
                 #print "leftcnt", leftintroncnt, " leftlen", leftintronlen    
-                leftdepth = leftintroncnt/leftefflen
+                leftdepth = leftintroncnt/float(leftefflen)
             rightintronidx = rightIntrons[i]
             if rightintronidx:
                 rightintronlen = self.getLength(rightintronidx)
@@ -540,21 +540,22 @@ class IntronFeatures(TEfeatures, object):
                     rightefflen = 1
                 rightintroncnt = intron_counts[rightintronidx]
                 #print "rightcnt", rightintroncnt, " rightlen", rightintronlen    
-                rightdepth = rightintroncnt/rightefflen
+                rightdepth = rightintroncnt/float(rightefflen)
 
             # assign new counts based on intron information
             if ((leftintronidx is None) and (rightintronidx is None)):      # maybe merged TEs
-                print TEnames[i]
+                print "missing introns: ", TEnames[i]
                 new_te_inst_counts[i] = 0
             else:
-                meanintrondepth = (leftdepth + rightdepth)/((leftintronidx is not None) + (rightintronidx is not None))
-                if (TEdepth < 1):
+                meanintrondepth = float(leftdepth + rightdepth)/((leftintronidx is not None) + (rightintronidx is not None))
+                if (TEdepth < 1/float(ReadLength)):
                     if (meanintrondepth == 0):
                         new_te_inst_counts[i] = te_inst_counts[i]
                     else:
                         new_te_inst_counts[i] = 0
                 else:
-                    discount = meanintrondepth/TEdepth
+                    discount = meanintrondepth/float(TEdepth)
+                    print "discounted: ", TEnames[i], " ",discount
                     new_te_inst_counts[i] = TEcnt - TEcnt*discount
                     if new_te_inst_counts[i] < 0:
                         new_te_inst_counts[i] = 0
