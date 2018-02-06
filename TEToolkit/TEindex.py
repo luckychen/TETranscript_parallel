@@ -15,9 +15,9 @@ with the distribution).
 import sys, time
 import logging
 from math import ceil,floor
-from ItvTree import ItvTree
-from Constants import TEindex_BINSIZE
-from Constants import ReadLength
+from TEToolkit.ItvTree import ItvTree
+from TEToolkit.Constants import TEindex_BINSIZE
+from TEToolkit.Constants import ReadLength
 
 #TEindex_BINSIZE = 200
 

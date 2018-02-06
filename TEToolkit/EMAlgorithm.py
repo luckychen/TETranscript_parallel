@@ -22,7 +22,7 @@ import sys
 import array
 import operator
 
-from Constants import *
+from TEToolkit.Constants import *
 
 def normalizeMeans(meansIn):
     total = sum(meansIn)

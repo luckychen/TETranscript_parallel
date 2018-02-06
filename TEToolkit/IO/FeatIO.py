@@ -28,7 +28,7 @@ import gzip
 from time import time
 
 
-from Constants import *
+from TEToolkit.Constants import *
 
 # ------------------------------------
 # Misc functions

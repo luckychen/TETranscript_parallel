@@ -14,7 +14,7 @@ from __future__ import absolute_import
 
 #from .abctree import ABCTree
 from array import array
-from Constants import TEindex_BINSIZE
+from TEToolkit.Constants import TEindex_BINSIZE
 
 __all__ = ['ItvTree']
 

@@ -18,8 +18,8 @@ import gzip
 import collections
 from  math import log
 
-from Constants import *
-from ShortRead.ParseBEDFile import BEDFile,BAMFile,SAMFile
+from TEToolkit.Constants import *
+from TEToolkit.ShortRead.ParseBEDFile import BEDFile,BAMFile,SAMFile
 
 
 #Taken from HTSeq

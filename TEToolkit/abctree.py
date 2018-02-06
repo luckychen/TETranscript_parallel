@@ -11,7 +11,7 @@ from __future__ import absolute_import
 import sys
 PYPY = hasattr(sys, 'pypy_version_info')
 
-from .treeslice import TreeSlice
+from TEToolkit.treeslice import TreeSlice
 from operator import attrgetter
 
 

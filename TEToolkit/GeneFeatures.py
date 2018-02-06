@@ -16,7 +16,7 @@ import gzip
 from math import ceil,floor
 import collections
 
-from IntervalTree import *
+from TEToolkit.IntervalTree import *
 
 #Taken from HTSeq
 class GFF_Reader( ):

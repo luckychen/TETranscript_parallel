@@ -25,11 +25,11 @@ import pysam
 import cPickle as pickle
 import gc
 
-from IO.ReadInputs import read_opts2
-from TEindex import *
-from EMAlgorithm import *
-from IntervalTree import *
-from GeneFeatures import *
+from TEToolkit.IO.ReadInputs import read_opts2
+from TEToolkit.TEindex import *
+from TEToolkit.EMAlgorithm import *
+from TEToolkit.IntervalTree import *
+from TEToolkit.GeneFeatures import *
 
 ### Define parameters for program ###
 def prepare_parser():
