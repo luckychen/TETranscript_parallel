@@ -82,6 +82,8 @@ def prepare_parser():
                         help='te Idx is pickled to be loaded in the next run')
     parser.add_argument('--origcnt', dest = 'b_origcnt', action="store_true",
                         help='count reads using original method from hammell lab')
+    parser.add_argument('--pairedreadname', dest = 'b_pairedreadname', action="store_true",
+                        help='read1 and read2 are encoded in readname as /1 and /2 instead of in FLAG: for TCGA mapsplice alignment files')
     parser.add_argument('--verbose', metavar='verbose', dest='verbose', type=int, nargs='?', default=2,
                         help='Set verbose level. 0: only show critical message, 1: show additional warning message, 2: show process information, 3: show debug messages. DEFAULT:2')
     parser.add_argument('--version', action='version', version='%(prog)s 1.5.0')
@@ -352,13 +354,13 @@ def count_transcript_abundance(filename, format, geneIdx, teIdx, intronIdx, stra
                     #    print "WRONG is_read1", aligned_read
                     #if aligned_read.is_read2 & (aligned_read.query_name[added_flag_pos+1]=="1"):
                     #    print "WRONG is_read2", aligned_read
-                    if (b_origcnt): 
+                    if (!b_pairedreadname): 
                         if aligned_read.is_read1 :
                                 multi_read1.append(aligned_read)
                         if aligned_read.is_read2 :
                                 multi_read2.append(aligned_read)
                     else:
-######## new counting ###############################
+######## pair info in read name #####################
                         if (aligned_read.query_name[added_flag_pos+1]=="1"):
                                 multi_read1.append(aligned_read)
                         if (aligned_read.query_name[added_flag_pos+1]=="2"):
@@ -400,13 +402,13 @@ def count_transcript_abundance(filename, format, geneIdx, teIdx, intronIdx, stra
                             multi_read1 = []
                             multi_read2 = []
                             prev_read_name = cur_read_name
-                            if (b_origcnt): 
+                            if (!b_pairedreadname): 
                                 if aligned_read.is_read1 :
                                     multi_read1.append(aligned_read)
                                 if aligned_read.is_read2 :
                                     multi_read2.append(aligned_read)
                             else:
-######## new counting ###############################
+######## pair info in read name #####################
                                 if (aligned_read.query_name[added_flag_pos+1]=="1"):
                                     multi_read1.append(aligned_read)
                                 if (aligned_read.query_name[added_flag_pos+1]=="2"):
@@ -533,13 +535,13 @@ def count_transcript_abundance(filename, format, geneIdx, teIdx, intronIdx, stra
             if not aligned_read.is_paired :
                 alignments_per_read.append((aligned_read,None))
             else :
-                if (b_origcnt): 
+                if (!b_pairedreadname): 
                     if aligned_read.is_read1 :
                         multi_read1.append(aligned_read)
                     if aligned_read.is_read2 :
                         multi_read2.append(aligned_read)
                 else:
-######## new counting ###############################
+######## pair info in read name #####################
                     if (aligned_read.query_name[added_flag_pos+1]=="1"):
                         multi_read1.append(aligned_read)
                     if (aligned_read.query_name[added_flag_pos+1]=="2"):
