@@ -1,4 +1,4 @@
-#!/usr/local/bin/python2.7
+#/usr/local/bin/python2.7
 
 '''
 Created on Jan 27, 2014
@@ -21,8 +21,8 @@ import traceback
 import subprocess
 import multiprocessing
 from time import time
-from pipeproxy import proxy
 from multiprocessing import Process
+from multiprocessing import Pool
 import datetime
 import pysam
 import cPickle as pickle
@@ -58,9 +58,11 @@ def prepare_parser():
 
     parser = argparse.ArgumentParser(prog='TEtranscripts',description=desc, epilog=exmp) #'Identifying differential transcription binding/histone modification sites.')
 
-    parser.add_argument('-t','--treatment', metavar='treatment sample', dest='tfiles',nargs='+', required=True,
+    parser.add_argument('-np','--nprocess', metavar='process number', dest='np', required=True,
                         help='Sample files in group 1 (e.g. treatment/mutant)')
-    parser.add_argument('-c','--control', metavar='control sample', dest='cfiles',nargs='+', required=False,
+    parser.add_argument('-t','--treatment', metavar='treatment sample', dest='tfiles',nargs=1, required=True,
+                        help='Sample files in group 1 (e.g. treatment/mutant)')
+    parser.add_argument('-c','--control', metavar='control sample', dest='cfiles',nargs=1, required=False,
                         help='Sample files in group 2 (e.g. control/wildtype)')
     parser.add_argument('--GTF', metavar='genic-GTF-file', dest='gtffile', type=str, required=True,
                         help='GTF file for gene annotations')
@@ -105,6 +107,7 @@ def prepare_parser():
                         help='read1 and read2 are encoded in readname as /1 and /2 instead of in FLAG: for TCGA mapsplice alignment files')
     parser.add_argument('--verbose', metavar='verbose', dest='verbose', type=int, nargs='?', default=2,
                         help='Set verbose level. 0: only show critical message, 1: show additional warning message, 2: show process information, 3: show debug messages. DEFAULT:2')
+    parser.add_argument('--np', dest='pn', action="store_true")
     parser.add_argument('--version', action='version', version='%(prog)s 1.5.0')
 
     return parser
@@ -958,7 +961,7 @@ class GetSetter(object):
         return self.var
 
 
-def subprocessWorker():
+def subprocessWorker(tfile):
     # Read sample files make count table
     global args
     global geneidx
@@ -968,39 +971,41 @@ def subprocessWorker():
     info = args.info
     info("\nReading sample files ...\n")
     
+    #ForkedPdb().set_trace()
     csamples_ele_tbl = None
     csamples_instance_tbl = None
     discounted_c_ele_tbl = None
     discounted_c_i_tbl = None
     csamples_rpm = 0
-    procIdx = multiprocessing.current_process()._identify[0]
-    tfiles  = tfileArry[procIdx] 
-
+    procIdx = multiprocessing.current_process()._identity[0]
+    outPrefix = tfile.split('.')[-4].split('/')[1] 
+    tfiles = []
+    tfiles.append(tfile)
     (tsamples_ele_tbl, tsamples_instance_tbl, discounted_t_ele_tbl, discounted_t_i_tbl, tsamples_rpm) = count_reads(tfiles, args.parser, geneIdx, teIdx, intronIdx, args.stranded, args.te_mode, args.sortByPos, args.prj_name,args.numItr,args.fragLength,args.maxL, args.b_origcnt)
-    if args.cfiles:
-        (csamples_ele_tbl, csamples_instance_tbl, discounted_c_ele_tbl, discounted_c_i_tbl, csamples_rpm) = count_reads(cfiles, args.parser, geneIdx, teIdx, intronIdx, args.stranded, args.te_mode, args.sortByPos, args.prj_name,args.numItr,args.fragLength,args.maxL, args.b_origcnt)
+    #if args.cfiles:
+    #    (csamples_ele_tbl, csamples_instance_tbl, discounted_c_ele_tbl, discounted_c_i_tbl, csamples_rpm) = count_reads(cfiles, args.parser, geneIdx, teIdx, intronIdx, args.stranded, args.te_mode, args.sortByPos, args.prj_name,args.numItr,args.fragLength,args.maxL, args.b_origcnt)
 
     info("Finished processing sample files")
 
     info("Generating counts table")
 
-    ForkedPdb().set_trace()
-    f_ele_tbl = args.prj_name + multiprocessing.current_process()._name + ".ele.cntTable"
-    f_instance_tbl = args.prj_name + multiprocessing.current_process()._name + ".instance.cntTable"
-    f_discounted_ele_tbl = args.prj_name + multiprocessing.current_process()._name + ".discount.ele.cntTable"
-    f_discounted_instance_tbl = args.prj_name + multiprocessing.current_process()._name + ".discount.instance.cntTable"
+    #ForkedPdb().set_trace()
+    f_ele_tbl = "./result/" + args.prj_name + outPrefix + ".ele.cntTable"
+    f_instance_tbl = "./result/" + args.prj_name + outPrefix + ".instance.cntTable"
+    f_discounted_ele_tbl = "./result/" + args.prj_name + outPrefix + ".discount.ele.cntTable"
+    f_discounted_instance_tbl = "./result/" + args.prj_name + outPrefix + ".discount.instance.cntTable"
     output_count_tbl(tsamples_ele_tbl, csamples_ele_tbl, f_ele_tbl)
     output_count_tbl(tsamples_instance_tbl, csamples_instance_tbl, f_instance_tbl)
     output_count_tbl(discounted_t_ele_tbl, discounted_c_ele_tbl, f_discounted_ele_tbl)
     output_count_tbl(discounted_t_i_tbl, discounted_c_i_tbl, f_discounted_instance_tbl)
     
-def readFileArray(fileHandler, np)
+def readFileArray(fileHandler, np):
     fileArray = []
     for x in range(0, np):
-        line = tfileHandler.readline()  
-    if "" == line:
-        break
-    fileArry.append(line)
+        line = fileHandler.readline()  
+        if "" == line:
+            break
+        fileArray.append(line[:-1])
     return fileArray
 
 args = None
@@ -1018,9 +1023,9 @@ def main():
     global geneIdx
     global intronIdx
     global tfileArray
-    args=read_opts2(prepare_parser())
+    args = read_opts2(prepare_parser())
     
-    ForkedPdb().set_trace()
+    #ForkedPdb().set_trace()
     info = args.info
     #warn = args.warn
     #debug = args.debug
@@ -1135,42 +1140,31 @@ def main():
 
     # Read sample files make count table
     info("\nReading sample files ...\n")
-
-    #teIdxProxy, teIdxProxyListener = proxy.createProxy(teIdx)
-    #argsProxy, argsProxyListener = proxy.createProxy(args)
-    #geneIdxProxy, geneIdxProxyListener = proxy.createProxy(geneIdx)
-    #intronIdxProxy, intronIdxProxyListener = proxy.createProxy(intronIdx)
-    #finished = GetSetter()
-    #finishedProxy, finishedProxyListener = proxy.createProxy(finished)
+    np = args.np
     end = False
+    fp = open(args.tfiles[0], 'r')
+    if args.cfiles:
+        fpc = open(args.cfiles, 'r')
     while end == False:
-        fp = open(args.tfile, 'r')
-        tfileArray = readTfile(args.tfile, np) 
-        if args.cfile
-            fp = open(args.cfile, 'r')
-            cfileArray = readCfile(args.cfile. np)
-        if tfileArray.size() == 0:
+        #ForkedPdb().set_trace()
+        tfileArray = readFileArray(fp, int(np)) 
+        if args.cfiles:
+            cfileArray = readFileArray(fpc, int(np))
+        if len(tfileArray) == 0:
             end = True 
             break
-        p = Pool(tfileArray.size())
-        Pool.map(subprocessWorker)
+        else: 
+            pList = []
+            for tfile in tfileArray:
+                pList.append(Process(target=subprocessWorker, args=(tfile,))) 
+            for p in pList:
+                p.start()
+            for p in pList:
+                p.join()
 
-    p2 = Process(target=subprocessWorker, args=())
-
-    p2.start()
-    #p3.start()
-    #p4.start()
-    #while finished.get() < 99:
-    #    argsProxyListener.listen()
-    #    geneIdxProxyListener.listen()
-    #    teIdxProxyListener.listen()
-    #    intronIdxProxyListener.listen()
-    #    finishedProxyListener.listen()
-
-    p2.join()
-    #p3.join()
-    #p4.join()
     fp.close()
+    if args.cfiles:
+        fpc.close()
 
         
     #csamples_ele_tbl = None
