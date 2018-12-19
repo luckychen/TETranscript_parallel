@@ -18,6 +18,7 @@ The function subprocessWorker() accept tfile as its only argument. All other dat
 To run this code please do following:
 
 ```
+mkdir result
 python ./bin/TEParallel.py --t tfilelist -np 3 --GTF gtf/GKN1/GKN1.refGene.gtf --TE gtf/GKN1/GKN1.rmsk_TE.gtf --intron gtf/GKN1/GKN1.intron_TE_interval.gtf
  --exonTE gtf/GKN1/GKN1.rmsk_TE_exonic.gtf --intergenicTE gtf/GKN1/GKN1.rmsk_TE_intergenic.gtf --project GKN1test  
 ```
@@ -27,7 +28,7 @@ will be 4)
 tfilelist is a file contains all treatment files location, I uploaded a sample file in this porject. 
 
 Please be aware that I made a ./result folder to store all the results, and I did some modificiation on the result file name to make it related to different input files. 
-Please correct it according to your process pipeline standard. 
+Please correct it according to your process pipeline standard. **Please make a empty ./result directory before run bin/TEparallel.py** 
 
 
 
