@@ -1,30 +1,20 @@
 Metadata-Version: 1.1
 Name: TEToolkit
-Version: 1.5.0
+Version: 1.5.1
 Summary: Tools for estimating differential enrichment of Transposable Elements and other highly repetitive regions
 Home-page: http://hammelllab.labsites.cshl.edu/software#TEToolkit
-Author: Ying Jin, Eric Paniagua, Oliver Tam and Molly Hammell
+Author: Ying Jin, Eric Paniagua, Oliver Tam, Molly Hammell
 Author-email: yjin@cshl.edu
 License: GPLv3
 Description: TEToolkit
         =========
         
-        Version: 1.5.0
+        Version: 1.5.1
         
-        TEToolkit is composed of two tools, TEpeaks and TEtranscripts, each
-        described in its own section below.
-        
-        *NOTE* Both programs rely on specially curated GTF files, which are not
+        *NOTE* TEtranscripts rely on specially curated GTF files, which are not
         packaged with this software due to their size. Please go to 
         `our website <http://hammelllab.labsites.cshl.edu/software#TEToolkit>`_
         for instructions to download the curated GTF files.
-        
-        TEpeaks takes ChIP-seq (and similar data) alignment files (BAM or BED),
-        identiifes narrow peaks, and is also able to do differential analysis over
-        peaks of two sets of libraries. It is an extension of MACS by adding the
-        funcionality of taking into account multi-reads, another normalization
-        method, bin correlation, and differential analysis. The differential
-        analysis is performed using DESeq. 
         
         TEtranscripts takes RNA-seq (and similar data) and annotates reads to both
         genes & transposable elements. It then performs differential analysis using
@@ -80,66 +70,6 @@ Description: TEToolkit
         
         to the PYTHONPATH variable, where python2.X refers to the 
         python version (e.g. python2.7 if using python version 2.7.x).
-        
-        
-        TEpeaks
-        =========
-        
-        Usage
-        ---------
-        
-        ::
-        
-            usage: TEpeaks -t treatment sample [treatment sample ...] 
-                                -c control sample [control sample ...]
-                                --tinput treatment input
-                                --cinput control input
-                                -s genome  
-                                [optional arguments]
-        
-            Required arguments:
-              -t | --treatment [treatment sample 1 treatment sample 2...]
-                 _Sample files in group 1 (e.g. treatment/mutant), separated by space_
-                 _Sample files in group 2 (e.g. control/wildtype), separated by space_
-              --tinput    treatment input 
-              -s genome  (hg: human, mm: mouse, dm: d. melanogaster)
-        
-            Optional arguments:
-              -c | --control [control sample 1 control sample 2 ...]
-              --cinput  control input
-              --format [input file format]
-                 Input file format: BAM or BED. DEFAULT: BAM
-              --project [name]      Name of this project. DEFAULT: TEpeak_out
-              -p | --padj [pvalue]
-                 FDR cutoff for significance. DEFAULT: 1e-5
-              -n | --norm [normalization]
-                 Normalization method : sd (library size),
-                                        bc (bin correlation). DEFAULT: sd
-              -r | --step           step size. DEFAULT: 100
-              -a | --auto           auto detect shiftsize. DEFAULT: False
-              -d | --diff           require differential analysis
-              -g | --gap            maximum allowed gap. DEFAULT: 1000
-              -f | --fragsize       fragment size. DEFAULT: 200
-              --lmfold              lower bound of fold change for modeling shipsize.
-                                    DEFAULT: 10
-              --umfold              upper bound of fold change for modeling shiftsize.
-                                    DEFAULT: 30
-              --minread             minimal reads of a peak. DEFAULT: 5
-              --mode                TE counting mode. 'uniq' consider uniq-reads only. 'multi' distribute to all alignments. DEFAULT: multi
-              --wig                 generate wiggle file for peaks (normalize to
-                                        10 million reads in total(library size))
-              -h | --help           help info
-        
-        
-        Example Command Lines
-        ----------------------
-        
-        ::
-        
-            TEpeaks --format BAM -t S1.bam --tinput S1input.bam -s mm -n sd --mode multi
-        
-            TEpeaks --format BAM -t S1.bam S2.bam -c C1.bam C2.bam  --tinput S1input.bam  --cinput C1input.bam -s mm -n sd --diff --mode multi
-        
         
         
         TEtranscripts
@@ -264,7 +194,7 @@ Description: TEToolkit
         Copying & distribution
         ======================
         
-        TEtranscripts and TEpeaks are part of TEToolKit.
+        TEtranscripts is part of TEToolKit.
         
         TEToolKit is free software: you can redistribute it and/or modify
         it under the terms of the GNU General Public License as published by

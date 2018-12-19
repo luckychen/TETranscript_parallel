@@ -354,7 +354,7 @@ def count_transcript_abundance(filename, format, geneIdx, teIdx, intronIdx, stra
                     #    print "WRONG is_read1", aligned_read
                     #if aligned_read.is_read2 & (aligned_read.query_name[added_flag_pos+1]=="1"):
                     #    print "WRONG is_read2", aligned_read
-                    if (not b_pairedreadname): 
+                    if ('b_pairedreadname' in vars()): 
                         if aligned_read.is_read1 :
                                 multi_read1.append(aligned_read)
                         if aligned_read.is_read2 :
@@ -402,7 +402,7 @@ def count_transcript_abundance(filename, format, geneIdx, teIdx, intronIdx, stra
                             multi_read1 = []
                             multi_read2 = []
                             prev_read_name = cur_read_name
-                            if (not b_pairedreadname): 
+                            if ('b_pairedreadname' in vars()): 
                                 if aligned_read.is_read1 :
                                     multi_read1.append(aligned_read)
                                 if aligned_read.is_read2 :
@@ -535,7 +535,7 @@ def count_transcript_abundance(filename, format, geneIdx, teIdx, intronIdx, stra
             if not aligned_read.is_paired :
                 alignments_per_read.append((aligned_read,None))
             else :
-                if (not b_pairedreadname): 
+                if ('b_pairedreadname' in vars()): 
                     if aligned_read.is_read1 :
                         multi_read1.append(aligned_read)
                     if aligned_read.is_read2 :
